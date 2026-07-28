@@ -148,8 +148,7 @@ const INITIAL_CALENDAR_LOGS: CalendarDayLog[] = [
 ];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'vitals' | 'symptoms' | 'wellness'>('vitals');
-  
+const [activeTab, setActiveTab] = useState<'vitals' | 'symptoms' | 'wellness' | 'fitness'>('vitals');  
   const [patients, setPatients] = useState<PatientProfile[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
@@ -486,6 +485,18 @@ export default function Dashboard() {
         >
           🌙 Sleep & Mental Health
         </button>
+        <button
+            onClick={() => setActiveTab('fitness')}
+            aria-selected={activeTab === 'fitness'}
+            role="tab"
+            className={`pb-3 px-3 text-xs font-bold transition-colors border-b-2 ${
+              activeTab === 'fitness'
+                ? 'border-indigo-700 text-indigo-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            🏃‍♂️ Activity & Fitness Sync
+          </button>
       </nav>
 
       {/* TAB 1: SUMMARY & EHR RECORD */}
@@ -1170,6 +1181,80 @@ export default function Dashboard() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+      {/* TAB 4: ACTIVITY & FITNESS SYNC */}
+      {activeTab === 'fitness' && (
+        <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 tracking-wide uppercase">
+                  🏃‍♂️ Apple Health Telemetry & Daily Activity
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Real-time metric syncing to monitor patient compliance with physician walking instructions.
+                </p>
+              </div>
+              <span className="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Apple Health Connected
+              </span>
+            </div>
+
+            {/* METRIC CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Steps</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">92% of Goal</span>
+                </div>
+                <div className="text-2xl font-bold text-indigo-400 mt-2">
+                  7,420 <span className="text-xs text-slate-400 font-normal">/ 8,000</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                  <div className="bg-indigo-500 h-full rounded-full" style={{ width: '92%' }}></div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Exercise</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Goal Met (30m)</span>
+                </div>
+                <div className="text-2xl font-bold text-emerald-400 mt-2">
+                  32 <span className="text-xs text-slate-400 font-normal">mins</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resting Heart Rate</span>
+                  <span className="text-[10px] text-slate-400">Normal Range</span>
+                </div>
+                <div className="text-2xl font-bold text-rose-400 mt-2">
+                  68 <span className="text-xs font-normal text-slate-400">bpm</span>
+                </div>
+                <div className="text-xs text-slate-400 mt-3">
+                  Weekly Average: <strong className="text-slate-200">67 bpm</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* AI CAREGIVER INSIGHT */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
+              <span className="text-base">💡</span>
+              <div className="text-xs text-slate-300 space-y-1">
+                <strong className="text-white block font-semibold">AI Clinical Telemetry Summary:</strong>
+                <p>
+                  Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery since starting the current Lisinopril regimen.
+                </p>
               </div>
             </div>
           </div>
