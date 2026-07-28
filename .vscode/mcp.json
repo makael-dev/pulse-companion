@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pulse-companion": {
+      "url": "http://localhost:3000/api/mcp",
+      "type": "http"
+    }
+  }
+}
