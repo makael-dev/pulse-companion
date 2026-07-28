@@ -21,6 +21,36 @@ const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Obstructive Sleep Apnea': 'A sleep disorder where breathing repeatedly stops and starts due to throat muscle relaxation.',
   'Chronic Kidney Disease (Stage 2)': 'Mild reduction in kidney filtering ability that requires regular monitoring.',
 };
+// Fitness telemetry data mapped by patient selection
+const PATIENT_FITNESS_DATA: Record<string, { steps: number; stepGoal: number; activeMins: number; minGoal: number; restingHR: number; weeklyAvgHR: number; note: string }> = {
+  'ezekiel-walter': {
+    steps: 7420,
+    stepGoal: 8000,
+    activeMins: 32,
+    minGoal: 30,
+    restingHR: 68,
+    weeklyAvgHR: 67,
+    note: "Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery."
+  },
+  'sarah-connor': {
+    steps: 10250,
+    stepGoal: 10000,
+    activeMins: 55,
+    minGoal: 45,
+    restingHR: 58,
+    weeklyAvgHR: 60,
+    note: "Sarah is consistently exceeding daily activity targets. High cardiovascular endurance maintained with no adverse fatigue markers."
+  },
+  'default': {
+    steps: 4100,
+    stepGoal: 8000,
+    activeMins: 15,
+    minGoal: 30,
+    restingHR: 74,
+    weeklyAvgHR: 75,
+    note: "Activity level is currently below target walking goal. Patient is encouraged to increase daily light aerobic movement."
+  }
+};
 
 type MedicationItem = {
   name: string;
