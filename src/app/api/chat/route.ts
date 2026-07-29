@@ -8,6 +8,16 @@ export async function POST(req: Request) {
 
     // --- 1. DYNAMIC CONVERSATIONAL INTENTS ---
 
+    // 💊 Missed Dose Guidelines (Captures 'miss', 'missed', 'dose', 'doss', 'forget', 'skip')
+    if (
+      lower.includes('forget') || lower.includes('miss') || lower.includes('forgot') || 
+      lower.includes('skip') || lower.includes('dose') || lower.includes('doss')
+    ) {
+      return NextResponse.json({
+        reply: "If you miss or forget a dose, take it as soon as you remember unless it is almost time for your next scheduled dose. Never take two doses at once to make up for a missed one. For specific guidelines on Lisinopril or Metformin, consult Dr. Vance or your pharmacist!"
+      });
+    }
+
     // 🥛 Administration & Intake Guidelines (e.g. water, food, timing)
     if (
       lower.includes('water') || lower.includes('food') || lower.includes('meal') ||
@@ -16,13 +26,6 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({
         reply: "Oral medications like Lisinopril and Metformin should generally be taken with a full glass of water. Metformin is best taken with meals to minimize stomach upset, while Lisinopril can be taken with or without food at the same time each morning. Always refer to your prescription directions!"
-      });
-    }
-
-    // 💊 Missed Dose Guidelines
-    if (lower.includes('forget') || lower.includes('missed') || lower.includes('forgot') || lower.includes('skip')) {
-      return NextResponse.json({
-        reply: "If you forget a dose, take it as soon as you remember unless it is almost time for your next scheduled dose. Never double up doses. If you frequently miss doses, speak with Dr. Vance about setting automated reminders!"
       });
     }
 
