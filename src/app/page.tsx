@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import SummaryTab from './components/SummaryTab';
 import SymptomTab from './components/SymptomTab';
 import MentalHealthTab from './components/MentalHealthTab';
@@ -462,8 +463,22 @@ const [activeTab, setActiveTab] = useState<'vitals' | 'symptoms' | 'wellness' | 
               </div>
 
               <div className="pt-2 flex items-center justify-between border-t border-slate-200 text-xs text-slate-600 font-medium">
-                <span>FHIR R4 Encrypted QR Stream</span>
-                <div className="bg-slate-900 text-white px-2 py-1 rounded font-mono text-xs">
+<div className="flex flex-col items-center justify-center p-4 my-2 bg-slate-50 border border-slate-200 rounded-xl">
+  <QRCodeSVG 
+    value={JSON.stringify({
+      id: patient?.id || 'P-84920',
+      name: patient?.name || 'Ezekiel Walter',
+      dob: patient?.dob || '1984-05-12',
+      allergies: patient?.allergies || ['Penicillin', 'Peanuts'],
+      contact: 'Clara Walter — (555) 234-9988'
+    })} 
+    size={140}
+    level="M"
+  />
+  <span className="text-[10px] font-semibold text-slate-500 mt-2">
+    Scan for FHIR R4 Encrypted Record
+  </span>
+</div>                <div className="bg-slate-900 text-white px-2 py-1 rounded font-mono text-xs">
                   [Scan for EHR]
                 </div>
               </div>
