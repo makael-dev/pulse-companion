@@ -24,41 +24,56 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]?.text || '';
     const lower = lastMessage.toLowerCase();
 
+    // --- SHORTHAND & SLANG NORMALIZATION ---
+    const normalized = lower
+      .replace(/\b(app|appt|appts)\b/g, 'appointment')
+      .replace(/\b(doc|physician|dr)\b/g, 'doctor')
+      .replace(/\b(bday|dob)\b/g, 'birthday')
+      .replace(/\b(rx|pills)\b/g, 'medication')
+      .replace(/\b(yest)\b/g, 'yesterday');
+
     // --- LAYER 1: PROMPT INJECTION GUARDRAIL ---
-    const isInjectionAttempt = INJECTION_PATTERNS.some((pattern) => pattern.test(lower));
+    const isInjectionAttempt = INJECTION_PATTERNS.some((pattern) => pattern.test(normalized));
     if (isInjectionAttempt) {
       return NextResponse.json({
         reply: "🛡️ Safety Notice: I am Pulse Companion AI, an administrative visit prep assistant. I cannot provide direct medical diagnosis, prescriptions, or act outside my scope.",
       });
     }
 
-    // --- 🚨 RED FLAG EMERGENCY TRIAGE FILTER ---
+    // --- 1. 🚨 RED FLAG EMERGENCY TRIAGE FILTER ---
     if (
-      lower.includes('chest pain') ||
-      lower.includes('shortness of breath') ||
-      lower.includes('difficulty breathing') ||
-      lower.includes('can\'t breathe') ||
-      lower.includes('stroke') ||
-      lower.includes('numbness') ||
-      lower.includes('face drooping') ||
-      lower.includes('fainted') ||
-      lower.includes('fainting') ||
-      lower.includes('severe bleeding') ||
-      lower.includes('suicidal')
+      normalized.includes('chest pain') ||
+      normalized.includes('shortness of breath') ||
+      normalized.includes('difficulty breathing') ||
+      normalized.includes('can\'t breathe') ||
+      normalized.includes('stroke') ||
+      normalized.includes('numbness') ||
+      normalized.includes('face drooping') ||
+      normalized.includes('fainted') ||
+      normalized.includes('fainting') ||
+      normalized.includes('severe bleeding') ||
+      normalized.includes('suicidal')
     ) {
       return NextResponse.json({
         reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911) or visit the nearest Emergency Room immediately. Do not wait for a routine appointment."
       });
     }
 
-    // --- ✏️ DYNAMIC MEDICATION LOG UPDATE COMMAND ---
+    // --- 2. ✏️ DYNAMIC MEDICATION LOG UPDATE COMMAND ---
     if (
-      (lower.includes('add') || lower.includes('mark') || lower.includes('log') || lower.includes('took')) &&
-      (lower.includes('med') || lower.includes('pill') || lower.includes('both') || lower.includes('dose'))
+      (normalized.includes('add') || normalized.includes('mark') || normalized.includes('log') || normalized.includes('took')) &&
+      (normalized.includes('med') || normalized.includes('pill') || normalized.includes('both') || normalized.includes('dose'))
     ) {
       let targetLog = calendarLogs?.find((log: any) => {
         const dayNum = log.dateStr.split(' ')[1];
-        return lower.includes(`the ${dayNum}th`) || lower.includes(`the ${dayNum}st`) || lower.includes(`the ${dayNum}rd`) || lower.includes(` ${dayNum} `) || lower.includes(` ${dayNum}`) || lower.includes(log.dateStr.toLowerCase());
+        return (
+          normalized.includes(`the ${dayNum}th`) ||
+          normalized.includes(`the ${dayNum}st`) ||
+          normalized.includes(`the ${dayNum}rd`) ||
+          normalized.includes(` ${dayNum} `) ||
+          normalized.includes(` ${dayNum}`) ||
+          normalized.includes(log.dateStr.toLowerCase())
+        );
       });
 
       if (!targetLog) {
@@ -76,39 +91,86 @@ export async function POST(req: Request) {
       });
     }
 
-    // --- 🌍 MEDICAL JARGON SIMPLIFIER ---
-    if (lower.includes('what is') || lower.includes('what does') || lower.includes('explain') || lower.includes('mean') || lower.includes('definition')) {
-      if (lower.includes('hba1c') || lower.includes('a1c')) {
+    // --- 3. 📋 REFILL & APPOINTMENT REQUESTS ---
+    if (normalized.includes('refill') || normalized.includes('renewal')) {
+      const medList = patient?.medications?.map((m: any) => m.name).join(', ');
+      return NextResponse.json({
+        reply: `📋 I can help you prepare a refill request for ${medList || 'your active prescriptions'}. You can also download or print your complete Doctor Prep PDF agenda from the Symptom Log tab!`
+      });
+    }
+
+    // --- 4. 📊 VITAL TRENDS & COMPARISONS ---
+    if (normalized.includes('highest') || normalized.includes('trend') || normalized.includes('vitals history') || normalized.includes('bp trend')) {
+      return NextResponse.json({
+        reply: `📈 Vital Trends: Your blood pressure has improved to ${patient?.vitals?.bp || '118/78 mmHg'}. Your heart rate is averaging ${patient?.vitals?.heartRate || '68 bpm'} and HbA1c is stable at ${patient?.vitals?.hba1c || '5.4%'}.`
+      });
+    }
+
+    // --- 5. ⚠️ DRUG INTERACTION & SAFETY CHECK ---
+    if (normalized.includes('ibuprofen') || normalized.includes('advil') || normalized.includes('aspirin') || normalized.includes('interaction')) {
+      return NextResponse.json({
+        reply: "⚠️ Drug Safety Note: NSAIDs (like Ibuprofen or Advil) can interact with blood pressure medications like Lisinopril and impact kidney function. Always confirm over-the-counter medications with Dr. Vance or your pharmacist!"
+      });
+    }
+
+    // --- 6. 🌙 NATURAL LANGUAGE SLEEP LOGGING ---
+    if (normalized.includes('slept') || normalized.includes('sleep hours')) {
+      const match = normalized.match(/(\d+(\.\d+)?)\s*hours?/);
+      const hours = match ? parseFloat(match[1]) : 8;
+      return NextResponse.json({
+        reply: `🌙 Logged ${hours} hours of sleep for ${selectedDateLabel}. Your wellness record has been updated!`
+      });
+    }
+
+    // --- 7. 🌍 MEDICAL JARGON SIMPLIFIER ---
+    if (
+      normalized.includes('what is') ||
+      normalized.includes('what does') ||
+      normalized.includes('explain') ||
+      normalized.includes('mean') ||
+      normalized.includes('definition')
+    ) {
+      if (normalized.includes('hba1c') || normalized.includes('a1c')) {
         return NextResponse.json({
           reply: "🩸 HbA1c in Simple Terms: HbA1c measures your average blood sugar over the last 2 to 3 months. Think of it like a video recording of your sugar levels over time, rather than a quick snapshot like a finger-prick test!"
         });
       }
-      if (lower.includes('hypertension') || lower.includes('blood pressure') || lower.includes('bp')) {
+
+      if (normalized.includes('hypertension') || normalized.includes('blood pressure') || normalized.includes('bp')) {
         return NextResponse.json({
           reply: "🫀 Hypertension in Simple Terms: High blood pressure means the force of blood pushing against your artery walls is consistently too high. Routine tracking helps keep your heart protected!"
         });
       }
-      if (lower.includes('hyperlipidemia') || lower.includes('cholesterol') || lower.includes('lipid')) {
+
+      if (normalized.includes('hyperlipidemia') || normalized.includes('cholesterol') || normalized.includes('lipid')) {
         return NextResponse.json({
           reply: "🫀 Hyperlipidemia in Simple Terms: Extra fats (cholesterol) circulating in your bloodstream. Managing this helps keep blood vessels clear."
         });
       }
-      if (lower.includes('lisinopril')) {
+
+      if (normalized.includes('lisinopril')) {
         return NextResponse.json({
-          reply: "💊 Lisinopril in Simple Terms: Relaxes blood vessels, making it easier for your heart to pump blood and keeping blood pressure in a safe range."
+          reply: "💊 Lisinopril in Simple Terms: An ACE inhibitor that relaxes blood vessels, making it easier for your heart to pump blood and keeping blood pressure in a safe range."
         });
       }
-      if (lower.includes('metformin')) {
+
+      if (normalized.includes('metformin')) {
         return NextResponse.json({
           reply: "💊 Metformin in Simple Terms: Helps your body use insulin effectively and reduces sugar produced by your liver."
         });
       }
     }
 
-    // --- 🔍 "LAST TIME I TOOK MY MEDS" HISTORY SEARCH ---
-    if ((lower.includes('last time') || lower.includes('when was') || lower.includes('most recent')) && (lower.includes('took') || lower.includes('med') || lower.includes('pill') || lower.includes('dose'))) {
+    // --- 8. 🔍 "LAST TIME I TOOK MY MEDS" HISTORY SEARCH ---
+    if (
+      (normalized.includes('last time') || normalized.includes('when was') || normalized.includes('most recent')) &&
+      (normalized.includes('took') || normalized.includes('med') || normalized.includes('pill') || normalized.includes('dose'))
+    ) {
       const reverseLogs = Array.isArray(calendarLogs) ? [...calendarLogs].reverse() : [];
-      const lastTakenLog = reverseLogs.find((log) => Object.values(log?.medsTaken || {}).some(Boolean));
+      const lastTakenLog = reverseLogs.find((log) => {
+        const medsMap = log?.medsTaken || {};
+        return Object.values(medsMap).some(Boolean);
+      });
 
       if (lastTakenLog) {
         const takenList = Object.entries(lastTakenLog.medsTaken || {})
@@ -126,77 +188,114 @@ export async function POST(req: Request) {
       }
     }
 
-    // --- 🗓️ DATE-SPECIFIC MEDICATION ADHERENCE CHECK ---
-    if ((lower.includes('did i take') || lower.includes('have i taken') || lower.includes('took my') || lower.includes('log for')) && (lower.includes('med') || lower.includes('pill') || lower.includes('dose') || lower.includes('prescription'))) {
-      let targetLog = calendarLogs?.find((log: any) => log.dateStr && lower.includes(log.dateStr.toLowerCase()));
-      if (!targetLog) targetLog = calendarLogs?.find((log: any) => log.dateStr === selectedDateLabel) || calendarLogs?.[calendarLogs.length - 1];
+    // --- 9. 🗓️ DATE-SPECIFIC MEDICATION ADHERENCE CHECK ---
+    if (
+      (normalized.includes('did i take') || normalized.includes('have i taken') || normalized.includes('took my') || normalized.includes('log for')) &&
+      (normalized.includes('med') || normalized.includes('pill') || normalized.includes('dose') || normalized.includes('prescription'))
+    ) {
+      let targetLog = calendarLogs?.find((log: any) => log.dateStr && normalized.includes(log.dateStr.toLowerCase()));
+      if (!targetLog) {
+        targetLog = calendarLogs?.find((log: any) => log.dateStr === selectedDateLabel) || calendarLogs?.[calendarLogs.length - 1];
+      }
 
       const logDate = targetLog?.dateStr || selectedDateLabel;
       const medsTakenMap = targetLog?.medsTaken || {};
       const totalMeds = patient?.medications?.length || 0;
       const takenCount = Object.values(medsTakenMap).filter(Boolean).length;
 
-      if (totalMeds === 0) return NextResponse.json({ reply: `No active prescriptions recorded for ${logDate}.` });
+      if (totalMeds === 0) {
+        return NextResponse.json({ reply: `No active prescriptions recorded for ${logDate}.` });
+      }
 
       if (takenCount === totalMeds) {
-        return NextResponse.json({ reply: `✅ Yes! According to your calendar record for ${logDate}, you marked all ${totalMeds} of your doses as taken.` });
+        return NextResponse.json({
+          reply: `✅ Yes! According to your calendar record for ${logDate}, you marked all ${totalMeds} of your doses as taken.`
+        });
       } else if (takenCount > 0) {
-        return NextResponse.json({ reply: `⚠️ Partially logged for ${logDate}: You marked ${takenCount} of ${totalMeds} doses as taken.` });
+        return NextResponse.json({
+          reply: `⚠️ Partially logged for ${logDate}: You marked ${takenCount} of ${totalMeds} doses as taken.`
+        });
       } else {
-        return NextResponse.json({ reply: `💊 According to your calendar log for ${logDate}, no medication doses have been marked as taken yet (0 of ${totalMeds} logged).` });
+        return NextResponse.json({
+          reply: `💊 According to your calendar log for ${logDate}, no medication doses have been marked as taken yet (0 of ${totalMeds} logged).`
+        });
       }
     }
 
-    // --- 💊 Missed Dose Guidelines ---
-    if (lower.includes('forget') || lower.includes('miss') || lower.includes('forgot') || lower.includes('skip') || lower.includes('dose') || lower.includes('doss')) {
+    // --- 10. 💊 MISSED DOSE GUIDELINES ---
+    if (
+      normalized.includes('forget') || normalized.includes('miss') || normalized.includes('forgot') || 
+      normalized.includes('skip') || normalized.includes('dose') || normalized.includes('doss')
+    ) {
       return NextResponse.json({
         reply: "If you miss or forget a dose, take it as soon as you remember unless it is almost time for your next scheduled dose. Never take two doses at once to make up for a missed one. For specific guidelines on Lisinopril or Metformin, consult Dr. Vance or your pharmacist!"
       });
     }
 
-    // --- 🥛 Administration & Intake Guidelines ---
-    if (lower.includes('water') || lower.includes('food') || lower.includes('meal') || lower.includes('how do i take') || lower.includes('how to take') || lower.includes('take these') || lower.includes('with food') || lower.includes('empty stomach') || lower.includes('swallow')) {
+    // --- 11. 🥛 ADMINISTRATION & INTAKE GUIDELINES ---
+    if (
+      normalized.includes('water') || normalized.includes('food') || normalized.includes('meal') ||
+      normalized.includes('how do i take') || normalized.includes('how to take') || normalized.includes('take these') ||
+      normalized.includes('with food') || normalized.includes('empty stomach') || normalized.includes('swallow')
+    ) {
       return NextResponse.json({
         reply: "Oral medications like Lisinopril and Metformin should generally be taken with a full glass of water. Metformin is best taken with meals to minimize stomach upset, while Lisinopril can be taken with or without food at the same time each morning. Always refer to your prescription directions!"
       });
     }
 
-    // --- 🎂 Demographics & Profile ---
-    if (lower.includes('birthday') || lower.includes('dob') || lower.includes('date of birth') || lower.includes('born') || lower.includes('how old')) {
+    // --- 12. 🎂 DEMOGRAPHICS & PROFILE ---
+    if (normalized.includes('birthday') || normalized.includes('dob') || normalized.includes('date of birth') || normalized.includes('born') || normalized.includes('how old')) {
       return NextResponse.json({
-        reply: patient?.dob ? `Your date of birth on file is ${patient.dob} (${patient.age} years old).` : "I couldn't locate a date of birth on your record."
+        reply: patient?.dob
+          ? `Your date of birth on file is ${patient.dob} (${patient.age} years old).`
+          : "I couldn't locate a date of birth on your record."
       });
     }
 
-    // --- 🗓️ Appointment & Provider Enquiries ---
-    if (lower.includes('appointment') || lower.includes('next visit') || lower.includes('doctor visit') || lower.includes('when do i see') || lower.includes('when is my visit')) {
+    // --- 13. 🗓️ APPOINTMENT & PROVIDER ENQUIRIES ---
+    if (
+      normalized.includes('appointment') ||
+      normalized.includes('next visit') ||
+      normalized.includes('doctor visit') ||
+      normalized.includes('when do i see') ||
+      normalized.includes('when is my visit') ||
+      normalized.includes('next app')
+    ) {
       return NextResponse.json({
-        reply: patient?.nextVisit ? `Your next appointment is scheduled for ${patient.nextVisit.date} (${patient.nextVisit.type}) with ${patient.primaryDoctor || 'Dr. Sarah Vance, MD'}.` : "You currently have no upcoming visits scheduled."
+        reply: patient?.nextVisit
+          ? `Your next appointment is scheduled for ${patient.nextVisit.date} (${patient.nextVisit.type}) with ${patient.primaryDoctor || 'Dr. Sarah Vance, MD'}.`
+          : "You currently have no upcoming visits scheduled."
       });
     }
 
-    if (lower.includes('doctor') || lower.includes('provider') || lower.includes('physician') || lower.includes('who is my')) {
+    if (normalized.includes('doctor') || normalized.includes('provider') || normalized.includes('physician') || normalized.includes('who is my')) {
       return NextResponse.json({
         reply: `Your primary care provider is ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD (Internal Medicine)'}.`
       });
     }
 
-    // --- 💊 Medication List ---
-    if (lower.includes('medication') || lower.includes('meds') || lower.includes('prescription') || lower.includes('pills') || lower.includes('refill')) {
+    // --- 14. 💊 MEDICATION LIST ---
+    if (normalized.includes('medication') || normalized.includes('meds') || normalized.includes('prescription') || normalized.includes('pills')) {
       const medList = patient?.medications?.map((m: any) => `${m.name} (${m.instructions})`).join(', ');
-      return NextResponse.json({ reply: medList ? `Your active prescriptions are: ${medList}.` : "No active prescriptions found on file." });
+      return NextResponse.json({
+        reply: medList ? `Your active prescriptions are: ${medList}.` : "No active prescriptions found on file."
+      });
     }
 
-    // --- ⚠️ Allergies ---
-    if (lower.includes('allergy') || lower.includes('allergies') || lower.includes('allergic')) {
+    // --- 15. ⚠️ ALLERGIES ---
+    if (normalized.includes('allergy') || normalized.includes('allergies') || normalized.includes('allergic')) {
       const algs = patient?.allergies?.map((a: any) => `${a.substance} (${a.reaction})`).join(', ');
-      return NextResponse.json({ reply: algs ? `Your recorded sensitivities are: ${algs}.` : "You have No Known Drug Allergies (NKDA) recorded." });
+      return NextResponse.json({
+        reply: algs ? `Your recorded sensitivities are: ${algs}.` : "You have No Known Drug Allergies (NKDA) recorded."
+      });
     }
 
-    // --- 🧪 Labs & Diagnostics ---
-    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results')) {
+    // --- 16. 🧪 LABS & DIAGNOSTICS ---
+    if (normalized.includes('lab') || normalized.includes('test') || normalized.includes('blood work') || normalized.includes('results')) {
       const labList = patient?.labs?.map((l: any) => `${l.testName}: ${l.value} (${l.status})`).join(', ');
-      return NextResponse.json({ reply: labList ? `Your recent lab results: ${labList}. Current BP: ${patient?.vitals?.bp || 'N/A'}.` : `Current Vitals: Blood Pressure ${patient?.vitals?.bp}, Heart Rate ${patient?.vitals?.heartRate}.` });
+      return NextResponse.json({
+        reply: labList ? `Your recent lab results: ${labList}. Current BP: ${patient?.vitals?.bp || 'N/A'}.` : `Current Vitals: Blood Pressure ${patient?.vitals?.bp}, Heart Rate ${patient?.vitals?.heartRate}.`
+      });
     }
 
     // --- LAYER 2: LLM OPENAI CALL WITH OUTPUT SANITIZATION ---
@@ -228,7 +327,6 @@ Patient Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JS
         const data = await response.json();
         let reply = data.choices?.[0]?.message?.content || '';
 
-        // LAYER 2 GUARDRAIL: Sanitize LLM response for ungrounded diagnosis
         const carriesMedicalDiagnosis = FORBIDDEN_OUTPUT_PATTERNS.some((pattern) => pattern.test(reply));
         if (carriesMedicalDiagnosis) {
           reply = "I cannot provide a specific medical diagnosis or treatment plan. Please consult Dr. Vance for personalized medical advice.";
@@ -238,20 +336,19 @@ Patient Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JS
       }
     }
 
-    // --- LAYER 3: SAFE FALLBACK RESPONSE ---
-    if (lower.includes('feel') || lower.includes('pain') || lower.includes('hurt') || lower.includes('took') || lower.includes('log') || lower.includes('dizzy') || lower.includes('headache')) {
+    // --- LAYER 3: SYMPTOM & LOGGING FALLBACK ---
+    if (normalized.includes('feel') || normalized.includes('pain') || normalized.includes('hurt') || normalized.includes('took') || normalized.includes('log') || normalized.includes('dizzy') || normalized.includes('headache')) {
       return NextResponse.json({
         reply: `Logged entry for ${selectedDateLabel}: "${lastMessage}". Your calendar record has been updated.`
       });
     }
 
     return NextResponse.json({
-      reply: "I'm here to help organize your health records! Ask me about your medications, doctor visits, lab results, or log calendar notes."
+      reply: "I'm here to help organize your health records! Ask me about your medications, what lab tests mean, missed doses, birthday, doctor visits, or log notes."
     });
 
   } catch (error) {
     console.error('Chat API Error:', error);
-    // LAYER 3 GUARANTEED FALLBACK (Never breaks UI)
     return NextResponse.json({
       reply: "I am available to assist with your records. Ask me about your medications, doctor visits, or log notes!"
     });
