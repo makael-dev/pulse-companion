@@ -7,10 +7,6 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 import PulseChatDrawer from './components/PulseChatDrawer';
-import SummaryTab from './components/SummaryTab';
-import SymptomTab from './components/SymptomTab';
-import MentalHealthTab from './components/MentalHealthTab';
-import FitnessTab from './components/FitnessTab';
 import VitalsChart from './components/VitalsChart';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
@@ -30,36 +26,6 @@ export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Migraine without aura': 'Recurring severe throbbing headaches often accompanied by light sensitivity or nausea.',
   'Obstructive Sleep Apnea': 'A sleep disorder where breathing repeatedly stops and starts due to throat muscle relaxation.',
   'Chronic Kidney Disease (Stage 2)': 'Mild reduction in kidney filtering ability that requires regular monitoring.',
-};
-
-export const PATIENT_FITNESS_DATA: Record<string, { steps: number; stepGoal: number; activeMins: number; minGoal: number; restingHR: number; weeklyAvgHR: number; note: string }> = {
-  'ezekiel-walter': {
-    steps: 7420,
-    stepGoal: 8000,
-    activeMins: 32,
-    minGoal: 30,
-    restingHR: 68,
-    weeklyAvgHR: 67,
-    note: "Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery."
-  },
-  'sarah-connor': {
-    steps: 10250,
-    stepGoal: 10000,
-    activeMins: 55,
-    minGoal: 45,
-    restingHR: 58,
-    weeklyAvgHR: 60,
-    note: "Sarah is consistently exceeding daily activity targets. High cardiovascular endurance maintained with no adverse fatigue markers."
-  },
-  'default': {
-    steps: 4100,
-    stepGoal: 8000,
-    activeMins: 15,
-    minGoal: 30,
-    restingHR: 74,
-    weeklyAvgHR: 75,
-    note: "Activity level is currently below target walking goal. Patient is encouraged to increase daily light aerobic movement."
-  }
 };
 
 type MedicationItem = {
@@ -111,6 +77,7 @@ type CalendarDayLog = {
   caffeineIntake?: 'None ☕' | '1-2 Cups ☕' | '3+ Cups ☕';
   activityLevel?: 'Sedentary' | 'Light' | 'Moderate' | 'Active';
   notes?: string;
+  medsTaken?: Record<string, boolean>; // Map of medication name -> taken state for this day
 };
 
 type DoctorNotes = {
@@ -213,6 +180,10 @@ function generateRolling28Days(): CalendarDayLog[] {
       caffeineIntake: '1-2 Cups ☕',
       activityLevel: 'Moderate',
       notes: '',
+      medsTaken: {
+        'Lisinopril 10 mg': true,
+        'Metformin 500 mg': i !== 2, // Sample history pattern
+      },
     });
   }
   return days;
@@ -224,17 +195,10 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
-  // --- MEDICATION TRACKER STATE ---
-  const [takenMeds, setTakenMeds] = useState<Record<string, boolean>>({});
+  const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
+  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
 
-  const toggleMedTaken = (medName: string) => {
-    setTakenMeds((prev) => ({
-      ...prev,
-      [medName]: !prev[medName],
-    }));
-  };
-
-  // --- EXPANDED CONSENT & PRIVACY CONTROL STATE ---
+  // --- CONSENT & PRIVACY CONTROL STATE ---
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentPermissions, setConsentPermissions] = useState({
     shareVitals: true,
@@ -267,9 +231,6 @@ export default function Dashboard() {
       shareEncounters: showAll,
     });
   };
-
-  const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
-  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
 
   useEffect(() => {
     const savedSymptoms = localStorage.getItem('pulse_symptoms');
@@ -355,6 +316,16 @@ export default function Dashboard() {
 
   const activeDayLog = calendarLogs[selectedDateIndex] || calendarLogs[calendarLogs.length - 1];
 
+  const toggleMedForDate = (medName: string, dateIdx: number) => {
+    const updated = [...calendarLogs];
+    const currentMeds = updated[dateIdx].medsTaken || {};
+    updated[dateIdx].medsTaken = {
+      ...currentMeds,
+      [medName]: !currentMeds[medName],
+    };
+    setCalendarLogs(updated);
+  };
+
   const handleUpdateCurrentDayNote = (noteText: string, targetDateStr?: string) => {
     const updated = [...calendarLogs];
     let targetIndex = selectedDateIndex;
@@ -399,7 +370,6 @@ export default function Dashboard() {
     const found = patients.find((p) => p.id === id);
     if (found) {
       setPatient(found);
-      setTakenMeds({});
     }
   };
 
@@ -480,8 +450,9 @@ export default function Dashboard() {
     window.print();
   };
 
+  const activeDayMeds = activeDayLog.medsTaken || {};
   const totalMedsCount = patient?.medications?.length || 0;
-  const takenMedsCount = Object.values(takenMeds).filter(Boolean).length;
+  const takenMedsCount = Object.values(activeDayMeds).filter(Boolean).length;
   const adherencePercent = totalMedsCount > 0 ? Math.round((takenMedsCount / totalMedsCount) * 100) : 100;
 
   return (
@@ -631,8 +602,8 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions & Reminder Tracker</span>
-                    <span className="text-[10px] text-slate-500">Show medication list, adherence tracker & dose logger</span>
+                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions & Pill Tracker</span>
+                    <span className="text-[10px] text-slate-500">Show medication list & calendar pill tracker</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1114,63 +1085,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* DAILY MEDICATION REMINDER & TRACKER */}
-                {consentPermissions.shareMeds && patient.medications && (
-                  <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">⏰</span>
-                        <div>
-                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
-                            Today's Pill Reminder & Adherence Tracker
-                          </h3>
-                          <p className="text-[10px] text-slate-500 font-medium">Click a medication to record your daily dose</p>
-                        </div>
-                      </div>
-                      <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-md ${
-                        adherencePercent === 100 ? 'bg-emerald-100 text-emerald-900' : 'bg-indigo-100 text-indigo-900'
-                      }`}>
-                        {takenMedsCount} / {totalMedsCount} Taken ({adherencePercent}%)
-                      </span>
-                    </div>
-
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-indigo-600 h-full transition-all duration-300" 
-                        style={{ width: `${adherencePercent}%` }}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {patient.medications.map((med, i) => {
-                        const isTaken = !!takenMeds[med.name];
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => toggleMedTaken(med.name)}
-                            className={`p-3 rounded-xl border text-left transition flex items-center justify-between ${
-                              isTaken 
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold' 
-                                : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                            }`}
-                          >
-                            <div className="space-y-0.5">
-                              <span className="text-xs font-extrabold block">{med.name}</span>
-                              <span className="text-[11px] text-slate-600 block">{med.instructions}</span>
-                            </div>
-                            <span className={`text-xs font-extrabold px-2 py-1 rounded-lg ${
-                              isTaken ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
-                            }`}>
-                              {isTaken ? '✅ Dose Logged' : '💊 Mark Taken'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* ACTIVE PRESCRIPTIONS */}
                   <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3 md:col-span-1">
@@ -1554,7 +1468,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 3: DYNAMIC ROLLING 28-DAY CALENDAR */}
+        {/* TAB 3: DYNAMIC ROLLING 28-DAY CALENDAR WITH INTEGRATED PILL TRACKER */}
         {activeTab === 'wellness' && (
           <section aria-label="Sleep & Daily Calendar Tracking" className="space-y-4">
             {consentPermissions.shareMentalHealth ? (
@@ -1572,11 +1486,14 @@ export default function Dashboard() {
                   <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 pt-1">
                     {calendarLogs.map((log, idx) => {
                       const isSelected = idx === selectedDateIndex;
+                      const hasNotes = !!log.notes;
+                      const dayMedsCount = Object.values(log.medsTaken || {}).filter(Boolean).length;
+
                       return (
                         <button
                           key={idx}
                           onClick={() => setSelectedDateIndex(idx)}
-                          className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center ${
+                          className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center relative ${
                             isSelected
                               ? 'bg-indigo-600 border-indigo-400 text-white font-extrabold shadow-md scale-105 z-10'
                               : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
@@ -1584,20 +1501,67 @@ export default function Dashboard() {
                         >
                           <span className="text-[9px] uppercase font-bold text-slate-400">{log.dayLabel}</span>
                           <span className="text-xs font-bold mt-0.5">{log.dateStr.split(' ')[1]}</span>
-                          {log.notes && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1"></span>}
+                          <div className="flex gap-1 mt-1">
+                            {dayMedsCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>}
+                            {hasNotes && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                          </div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-4">
+                {/* CALENDAR DATE LOG DETAILS & INTEGRATED PILL TRACKER */}
+                <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <h3 className="text-sm font-extrabold text-slate-900">
                       📝 Logged Entry for: <span className="text-indigo-700">{activeDayLog.dateStr}</span> ({activeDayLog.dayLabel})
                     </h3>
                     <span className="text-xs text-slate-500 font-medium">Auto-saves to browser & AI chat</span>
                   </div>
+
+                  {/* PILL TRACKER FOR SELECTED CALENDAR DAY */}
+                  {consentPermissions.shareMeds && patient?.medications && (
+                    <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-indigo-200 pb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">💊</span>
+                          <span className="text-xs font-bold text-indigo-950">Medication Dose Log for {activeDayLog.dateStr}</span>
+                        </div>
+                        <span className="text-[11px] font-bold text-indigo-900 bg-indigo-200 px-2 py-0.5 rounded">
+                          {takenMedsCount} / {totalMedsCount} Taken ({adherencePercent}%)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {patient.medications.map((med, i) => {
+                          const isTaken = !!activeDayMeds[med.name];
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => toggleMedForDate(med.name, selectedDateIndex)}
+                              className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between ${
+                                isTaken
+                                  ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-bold'
+                                  : 'bg-white border-indigo-200 text-slate-800 hover:bg-indigo-100'
+                              }`}
+                            >
+                              <div className="space-y-0.5">
+                                <span className="text-xs font-bold block">• {med.name}</span>
+                                <span className="text-[10px] text-slate-500 block">{med.instructions}</span>
+                              </div>
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                                isTaken ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                              }`}>
+                                {isTaken ? '✅ Taken' : '💊 Mark Taken'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-800 block">Daily Mood & Energy:</label>

@@ -6,9 +6,72 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]?.text || '';
     const lower = lastMessage.toLowerCase();
 
-    // --- 1. DYNAMIC CONVERSATIONAL INTENTS ---
+    // --- 1. 🚨 RED FLAG EMERGENCY TRIAGE FILTER ---
+    if (
+      lower.includes('chest pain') ||
+      lower.includes('shortness of breath') ||
+      lower.includes('difficulty breathing') ||
+      lower.includes('can\'t breathe') ||
+      lower.includes('stroke') ||
+      lower.includes('numbness') ||
+      lower.includes('face drooping') ||
+      lower.includes('fainted') ||
+      lower.includes('fainting') ||
+      lower.includes('severe bleeding') ||
+      lower.includes('suicidal')
+    ) {
+      return NextResponse.json({
+        reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911 in the US) or visit the nearest Emergency Room immediately. Do not wait for a routine appointment."
+      });
+    }
 
-    // 💊 Missed Dose Guidelines (Captures 'miss', 'missed', 'dose', 'doss', 'forget', 'skip')
+    // --- 2. 🌍 MEDICAL JARGON SIMPLIFIER ---
+    if (
+      lower.includes('what is') ||
+      lower.includes('what does') ||
+      lower.includes('explain') ||
+      lower.includes('mean') ||
+      lower.includes('definition')
+    ) {
+      // HbA1c
+      if (lower.includes('hba1c') || lower.includes('a1c')) {
+        return NextResponse.json({
+          reply: "🩸 HbA1c in Simple Terms: HbA1c measures your average blood sugar over the last 2 to 3 months. Think of it like a video recording of your sugar levels over time, rather than a quick snapshot like a finger-prick test!"
+        });
+      }
+
+      // Hypertension / BP
+      if (lower.includes('hypertension') || lower.includes('blood pressure') || lower.includes('bp')) {
+        return NextResponse.json({
+          reply: "🫀 Hypertension in Simple Terms: High blood pressure means the force of blood pushing against your artery walls is consistently too high—like water flowing through a narrow hose under high pressure. Routine tracking helps keep your heart protected!"
+        });
+      }
+
+      // Hyperlipidemia / Cholesterol
+      if (lower.includes('hyperlipidemia') || lower.includes('cholesterol') || lower.includes('lipid')) {
+        return NextResponse.json({
+          reply: "🫀 Hyperlipidemia in Simple Terms: This means there are extra fats (lipids or cholesterol) circulating in your bloodstream. Managing this helps keep your blood vessels clear and smooth."
+        });
+      }
+
+      // Lisinopril
+      if (lower.includes('lisinopril')) {
+        return NextResponse.json({
+          reply: "💊 Lisinopril in Simple Terms: An ACE inhibitor that relaxes your blood vessels, making it easier for your heart to pump blood and keeping your blood pressure in a safe range."
+        });
+      }
+
+      // Metformin
+      if (lower.includes('metformin')) {
+        return NextResponse.json({
+          reply: "💊 Metformin in Simple Terms: A diabetes medication that helps your body use insulin more effectively and reduces the amount of sugar your liver produces into your blood."
+        });
+      }
+    }
+
+    // --- 3. DYNAMIC CONVERSATIONAL INTENTS ---
+
+    // 💊 Missed Dose Guidelines
     if (
       lower.includes('forget') || lower.includes('miss') || lower.includes('forgot') || 
       lower.includes('skip') || lower.includes('dose') || lower.includes('doss')
@@ -18,7 +81,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 🥛 Administration & Intake Guidelines (e.g. water, food, timing)
+    // 🥛 Administration & Intake Guidelines
     if (
       lower.includes('water') || lower.includes('food') || lower.includes('meal') ||
       lower.includes('how do i take') || lower.includes('how to take') || lower.includes('take these') ||
@@ -29,7 +92,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 🎂 Patient Demographics & Profile (Birthday, Age, Location)
+    // 🎂 Demographics & Profile
     if (lower.includes('birthday') || lower.includes('dob') || lower.includes('date of birth') || lower.includes('born') || lower.includes('how old')) {
       return NextResponse.json({
         reply: patient?.dob
@@ -53,7 +116,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 💊 Medication List & Refills
+    // 💊 Medication List
     if (lower.includes('medication') || lower.includes('meds') || lower.includes('prescription') || lower.includes('pills') || lower.includes('refill')) {
       const medList = patient?.medications?.map((m: any) => `${m.name} (${m.instructions})`).join(', ');
       return NextResponse.json({
@@ -61,7 +124,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // ⚠️ Allergies & Sensitivities
+    // ⚠️ Allergies
     if (lower.includes('allergy') || lower.includes('allergies') || lower.includes('allergic')) {
       const algs = patient?.allergies?.map((a: any) => `${a.substance} (${a.reaction})`).join(', ');
       return NextResponse.json({
@@ -70,14 +133,14 @@ export async function POST(req: Request) {
     }
 
     // 🧪 Labs & Diagnostics
-    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results') || lower.includes('hba1c') || lower.includes('bp')) {
+    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results')) {
       const labList = patient?.labs?.map((l: any) => `${l.testName}: ${l.value} (${l.status})`).join(', ');
       return NextResponse.json({
         reply: labList ? `Your recent lab results: ${labList}. Current BP: ${patient?.vitals?.bp || 'N/A'}.` : `Current Vitals: Blood Pressure ${patient?.vitals?.bp}, Heart Rate ${patient?.vitals?.heartRate}.`
       });
     }
 
-    // --- 2. LLM OPENAI FALLBACK (If configured in environment) ---
+    // --- 4. LLM OPENAI FALLBACK (If configured in environment) ---
     if (process.env.OPENAI_API_KEY) {
       const systemPrompt = `You are Pulse Companion AI, an empathetic health management assistant.
 Patient Record Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JSON.stringify(patient?.medications || [])}, Doctor: ${patient?.primaryDoctor}.
@@ -109,7 +172,7 @@ Answer the user's question clearly and concisely based on their record.`;
       }
     }
 
-    // --- 3. SYMPTOM / CALENDAR ENTRY FALLBACK ---
+    // --- 5. CALENDAR LOGGING FALLBACK ---
     if (lower.includes('feel') || lower.includes('pain') || lower.includes('hurt') || lower.includes('took') || lower.includes('log') || lower.includes('dizzy') || lower.includes('headache')) {
       return NextResponse.json({
         reply: `Logged entry for ${selectedDateLabel}: "${lastMessage}". Your calendar record has been updated.`
@@ -117,7 +180,7 @@ Answer the user's question clearly and concisely based on their record.`;
     }
 
     return NextResponse.json({
-      reply: "I'm here to help with your health records! You can ask about your medications, missed doses, birthday, doctor visits, or lab results."
+      reply: "I'm here to help with your health records! You can ask about your medications, what lab tests mean, missed doses, birthday, doctor visits, or log notes."
     });
 
   } catch (error) {
