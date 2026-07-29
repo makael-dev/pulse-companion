@@ -224,6 +224,16 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
+  // --- MEDICATION TRACKER STATE ---
+  const [takenMeds, setTakenMeds] = useState<Record<string, boolean>>({});
+
+  const toggleMedTaken = (medName: string) => {
+    setTakenMeds((prev) => ({
+      ...prev,
+      [medName]: !prev[medName],
+    }));
+  };
+
   // --- EXPANDED CONSENT & PRIVACY CONTROL STATE ---
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentPermissions, setConsentPermissions] = useState({
@@ -389,6 +399,7 @@ export default function Dashboard() {
     const found = patients.find((p) => p.id === id);
     if (found) {
       setPatient(found);
+      setTakenMeds({});
     }
   };
 
@@ -459,7 +470,6 @@ export default function Dashboard() {
 
   const handleCopySummary = () => {
     if (!generatedQuestions || !patient) return;
-    const weeklyAvgSleep = (calendarLogs.reduce((acc, curr) => acc + curr.sleepHours, 0) / calendarLogs.length).toFixed(1);
     const summaryText = `--- Doctor Prep Summary ---\nPatient: ${patient.name}\nEmail: ${patient.email || 'N/A'}\nPhone: ${patient.phone || 'N/A'}\nDOB: ${patient.dob || 'N/A'} (Age ${patient.age}) | Sex: ${patient.gender}\nLocation: ${patient.location}\nLast Visit: ${patient.lastVisitDate}\n\nLogged Symptoms:\n${symptoms.map((s) => `- ${s.text} [Severity: ${s.severity} | Duration: ${s.duration}]`).join('\n')}\n\nSelected Date Notes (${activeDayLog.dateStr}):\n${activeDayLog.notes || 'None'}\n\nQuestions for Doctor:\n${generatedQuestions}`;
     navigator.clipboard.writeText(summaryText);
     setCopied(true);
@@ -469,6 +479,10 @@ export default function Dashboard() {
   const handlePrintAgenda = () => {
     window.print();
   };
+
+  const totalMedsCount = patient?.medications?.length || 0;
+  const takenMedsCount = Object.values(takenMeds).filter(Boolean).length;
+  const adherencePercent = totalMedsCount > 0 ? Math.round((takenMedsCount / totalMedsCount) * 100) : 100;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8 max-w-4xl mx-auto font-sans print:bg-white print:p-0 flex flex-col justify-between">
@@ -617,8 +631,8 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions</span>
-                    <span className="text-[10px] text-slate-500">Show medication list & dosage instructions</span>
+                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions & Reminder Tracker</span>
+                    <span className="text-[10px] text-slate-500">Show medication list, adherence tracker & dose logger</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1097,6 +1111,63 @@ export default function Dashboard() {
                     <span className="text-2xl">🔒</span>
                     <p className="text-xs font-bold text-slate-800">Vital Signs & Chart Redacted</p>
                     <p className="text-[11px] text-slate-500">Hidden via Privacy Controls.</p>
+                  </div>
+                )}
+
+                {/* DAILY MEDICATION REMINDER & TRACKER */}
+                {consentPermissions.shareMeds && patient.medications && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⏰</span>
+                        <div>
+                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                            Today's Pill Reminder & Adherence Tracker
+                          </h3>
+                          <p className="text-[10px] text-slate-500 font-medium">Click a medication to record your daily dose</p>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-md ${
+                        adherencePercent === 100 ? 'bg-emerald-100 text-emerald-900' : 'bg-indigo-100 text-indigo-900'
+                      }`}>
+                        {takenMedsCount} / {totalMedsCount} Taken ({adherencePercent}%)
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-indigo-600 h-full transition-all duration-300" 
+                        style={{ width: `${adherencePercent}%` }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {patient.medications.map((med, i) => {
+                        const isTaken = !!takenMeds[med.name];
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleMedTaken(med.name)}
+                            className={`p-3 rounded-xl border text-left transition flex items-center justify-between ${
+                              isTaken 
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold' 
+                                : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-extrabold block">{med.name}</span>
+                              <span className="text-[11px] text-slate-600 block">{med.instructions}</span>
+                            </div>
+                            <span className={`text-xs font-extrabold px-2 py-1 rounded-lg ${
+                              isTaken ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {isTaken ? '✅ Dose Logged' : '💊 Mark Taken'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

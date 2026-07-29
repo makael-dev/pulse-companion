@@ -6,71 +6,79 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]?.text || '';
     const lower = lastMessage.toLowerCase();
 
-    // 1. FAST LOCAL INTENT MATCHING
+    // --- 1. DYNAMIC CONVERSATIONAL INTENTS ---
 
-    // 💊 Missed Medication / Forget Dose Follow-up
+    // 🥛 Administration & Intake Guidelines (e.g. water, food, timing)
+    if (
+      lower.includes('water') || lower.includes('food') || lower.includes('meal') ||
+      lower.includes('how do i take') || lower.includes('how to take') || lower.includes('take these') ||
+      lower.includes('with food') || lower.includes('empty stomach') || lower.includes('swallow')
+    ) {
+      return NextResponse.json({
+        reply: "Oral medications like Lisinopril and Metformin should generally be taken with a full glass of water. Metformin is best taken with meals to minimize stomach upset, while Lisinopril can be taken with or without food at the same time each morning. Always refer to your prescription directions!"
+      });
+    }
+
+    // 💊 Missed Dose Guidelines
     if (lower.includes('forget') || lower.includes('missed') || lower.includes('forgot') || lower.includes('skip')) {
       return NextResponse.json({
-        reply: "If you forget to take a dose, generally take it as soon as you remember unless it's almost time for your next scheduled dose. Never double up doses. For specific guidelines on your prescriptions (like Lisinopril or Metformin), please consult your pharmacist or Dr. Vance!"
+        reply: "If you forget a dose, take it as soon as you remember unless it is almost time for your next scheduled dose. Never double up doses. If you frequently miss doses, speak with Dr. Vance about setting automated reminders!"
       });
     }
 
-    // 🎂 Birthday / DOB
-    if (lower.includes('birthday') || lower.includes('dob') || lower.includes('date of birth') || lower.includes('when was i born')) {
+    // 🎂 Patient Demographics & Profile (Birthday, Age, Location)
+    if (lower.includes('birthday') || lower.includes('dob') || lower.includes('date of birth') || lower.includes('born') || lower.includes('how old')) {
       return NextResponse.json({
         reply: patient?.dob
-          ? `Your birthday on file is ${patient.dob} (${patient.age} years old).`
-          : "I couldn't find a date of birth listed on your record."
+          ? `Your date of birth on file is ${patient.dob} (${patient.age} years old).`
+          : "I couldn't locate a date of birth on your record."
       });
     }
 
-    // 🗓️ Next Visit / Appointment
+    // 🗓️ Appointment & Provider Enquiries
     if (lower.includes('appointment') || lower.includes('next visit') || lower.includes('doctor visit') || lower.includes('when do i see') || lower.includes('when is my visit')) {
       return NextResponse.json({
         reply: patient?.nextVisit
-          ? `Your next visit is scheduled for ${patient.nextVisit.date} (${patient.nextVisit.type}) with ${patient.primaryDoctor || 'Dr. Vance'}.`
-          : "You don't have any upcoming appointments scheduled."
+          ? `Your next appointment is scheduled for ${patient.nextVisit.date} (${patient.nextVisit.type}) with ${patient.primaryDoctor || 'Dr. Sarah Vance, MD'}.`
+          : "You currently have no upcoming visits scheduled."
       });
     }
 
-    // 💊 Active Medications List
-    if (lower.includes('medication') || lower.includes('meds') || lower.includes('prescription') || lower.includes('pills')) {
+    if (lower.includes('doctor') || lower.includes('provider') || lower.includes('physician') || lower.includes('who is my')) {
+      return NextResponse.json({
+        reply: `Your primary care provider is ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD (Internal Medicine)'}.`
+      });
+    }
+
+    // 💊 Medication List & Refills
+    if (lower.includes('medication') || lower.includes('meds') || lower.includes('prescription') || lower.includes('pills') || lower.includes('refill')) {
       const medList = patient?.medications?.map((m: any) => `${m.name} (${m.instructions})`).join(', ');
       return NextResponse.json({
-        reply: medList
-          ? `Your active prescriptions are: ${medList}.`
-          : "No active prescriptions on file."
+        reply: medList ? `Your active prescriptions are: ${medList}.` : "No active prescriptions found on file."
       });
     }
 
-    // 🩺 Doctor Info
-    if (lower.includes('doctor') || lower.includes('provider') || lower.includes('physician')) {
-      return NextResponse.json({
-        reply: `Your primary care provider is ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD'}.`
-      });
-    }
-
-    // ⚠️ Allergies
+    // ⚠️ Allergies & Sensitivities
     if (lower.includes('allergy') || lower.includes('allergies') || lower.includes('allergic')) {
       const algs = patient?.allergies?.map((a: any) => `${a.substance} (${a.reaction})`).join(', ');
       return NextResponse.json({
-        reply: algs ? `Your recorded drug allergies are: ${algs}.` : "You have No Known Drug Allergies (NKDA) on file."
+        reply: algs ? `Your recorded sensitivities are: ${algs}.` : "You have No Known Drug Allergies (NKDA) recorded."
       });
     }
 
-    // 🧪 Labs / Test Results
-    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results')) {
+    // 🧪 Labs & Diagnostics
+    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results') || lower.includes('hba1c') || lower.includes('bp')) {
       const labList = patient?.labs?.map((l: any) => `${l.testName}: ${l.value} (${l.status})`).join(', ');
       return NextResponse.json({
-        reply: labList ? `Your recent lab results are: ${labList}.` : "No recent lab results found on file."
+        reply: labList ? `Your recent lab results: ${labList}. Current BP: ${patient?.vitals?.bp || 'N/A'}.` : `Current Vitals: Blood Pressure ${patient?.vitals?.bp}, Heart Rate ${patient?.vitals?.heartRate}.`
       });
     }
 
-    // 2. LLM FALLBACK (If OPENAI_API_KEY is configured in Vercel / .env.local)
+    // --- 2. LLM OPENAI FALLBACK (If configured in environment) ---
     if (process.env.OPENAI_API_KEY) {
-      const systemPrompt = `You are Pulse Companion AI, an empathetic health assistant.
-Patient Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JSON.stringify(patient?.medications || [])}.
-Answer the user's question concisely, accurately, and accessibly.`;
+      const systemPrompt = `You are Pulse Companion AI, an empathetic health management assistant.
+Patient Record Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JSON.stringify(patient?.medications || [])}, Doctor: ${patient?.primaryDoctor}.
+Answer the user's question clearly and concisely based on their record.`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -98,14 +106,13 @@ Answer the user's question concisely, accurately, and accessibly.`;
       }
     }
 
-    // 3. CALENDAR LOGGING (Only if user explicitly mentions logging or a symptom)
-    if (lower.includes('feel') || lower.includes('pain') || lower.includes('hurt') || lower.includes('took') || lower.includes('log')) {
+    // --- 3. SYMPTOM / CALENDAR ENTRY FALLBACK ---
+    if (lower.includes('feel') || lower.includes('pain') || lower.includes('hurt') || lower.includes('took') || lower.includes('log') || lower.includes('dizzy') || lower.includes('headache')) {
       return NextResponse.json({
         reply: `Logged entry for ${selectedDateLabel}: "${lastMessage}". Your calendar record has been updated.`
       });
     }
 
-    // Default friendly response
     return NextResponse.json({
       reply: "I'm here to help with your health records! You can ask about your medications, missed doses, birthday, doctor visits, or lab results."
     });
