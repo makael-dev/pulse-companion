@@ -77,7 +77,7 @@ type CalendarDayLog = {
   caffeineIntake?: 'None ☕' | '1-2 Cups ☕' | '3+ Cups ☕';
   activityLevel?: 'Sedentary' | 'Light' | 'Moderate' | 'Active';
   notes?: string;
-  medsTaken?: Record<string, boolean>; // Map of medication name -> taken state for this day
+  medsTaken?: Record<string, boolean>;
 };
 
 type DoctorNotes = {
@@ -182,7 +182,7 @@ function generateRolling28Days(): CalendarDayLog[] {
       notes: '',
       medsTaken: {
         'Lisinopril 10 mg': true,
-        'Metformin 500 mg': i !== 2, // Sample history pattern
+        'Metformin 500 mg': i !== 2,
       },
     });
   }
@@ -324,6 +324,20 @@ export default function Dashboard() {
       [medName]: !currentMeds[medName],
     };
     setCalendarLogs(updated);
+  };
+
+  const handleLogMedsForDate = (targetDateStr: string) => {
+    const updated = [...calendarLogs];
+    const targetIdx = updated.findIndex((log) => log.dateStr.toLowerCase() === targetDateStr.toLowerCase());
+    
+    if (targetIdx !== -1 && patient?.medications) {
+      const allMedsTaken: Record<string, boolean> = {};
+      patient.medications.forEach((m) => {
+        allMedsTaken[m.name] = true;
+      });
+      updated[targetIdx].medsTaken = allMedsTaken;
+      setCalendarLogs(updated);
+    }
   };
 
   const handleUpdateCurrentDayNote = (noteText: string, targetDateStr?: string) => {
@@ -1802,6 +1816,7 @@ export default function Dashboard() {
         calendarLogs={calendarLogs}
         selectedDateLabel={activeDayLog.dateStr}
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
+        onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
       />
     </div>
   );

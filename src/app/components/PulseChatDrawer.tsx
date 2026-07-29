@@ -7,6 +7,7 @@ type PulseChatDrawerProps = {
   calendarLogs: any[];
   selectedDateLabel: string;
   onLogToCalendar: (noteText: string, targetDateStr?: string) => void;
+  onLogMedsForDate?: (targetDateStr: string) => void;
 };
 
 type Message = {
@@ -16,8 +17,10 @@ type Message = {
 
 export default function PulseChatDrawer({
   patient,
+  calendarLogs,
   selectedDateLabel,
   onLogToCalendar,
+  onLogMedsForDate,
 }: PulseChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -44,19 +47,6 @@ export default function PulseChatDrawer({
     setInput('');
     setIsThinking(true);
 
-    // If user message looks like a symptom/log entry, also update the calendar
-    const lower = text.toLowerCase();
-    if (
-      lower.includes('feel') ||
-      lower.includes('pain') ||
-      lower.includes('hurt') ||
-      lower.includes('took') ||
-      lower.includes('log') ||
-      lower.includes('headache')
-    ) {
-      onLogToCalendar(text, selectedDateLabel);
-    }
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -65,11 +55,17 @@ export default function PulseChatDrawer({
           messages: newMessages,
           patient,
           selectedDateLabel,
+          calendarLogs,
         }),
       });
 
       const data = await res.json();
       setMessages((prev) => [...prev, { sender: 'assistant', text: data.reply }]);
+
+      // Execute action if returned from API
+      if (data.action?.type === 'LOG_MEDS_TAKEN' && onLogMedsForDate) {
+        onLogMedsForDate(data.action.targetDateStr);
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
