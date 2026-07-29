@@ -224,14 +224,39 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
-  // --- CONSENT & PRIVACY CONTROL STATE ---
+  // --- EXPANDED CONSENT & PRIVACY CONTROL STATE ---
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentPermissions, setConsentPermissions] = useState({
+    shareVitals: true,
+    shareDelta: true,
+    shareDoctorNotes: true,
+    shareSymptomPrep: true,
+    shareDiagnoses: true,
+    shareAllergies: true,
+    shareMeds: true,
     shareLabs: true,
     shareMentalHealth: true,
     shareFitness: true,
-    shareMeds: true,
+    shareTrials: true,
+    shareEncounters: true,
   });
+
+  const toggleAllPrivacyPermissions = (showAll: boolean) => {
+    setConsentPermissions({
+      shareVitals: showAll,
+      shareDelta: showAll,
+      shareDoctorNotes: showAll,
+      shareSymptomPrep: showAll,
+      shareDiagnoses: showAll,
+      shareAllergies: showAll,
+      shareMeds: showAll,
+      shareLabs: showAll,
+      shareMentalHealth: showAll,
+      shareFitness: showAll,
+      shareTrials: showAll,
+      shareEncounters: showAll,
+    });
+  };
 
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
@@ -494,7 +519,7 @@ export default function Dashboard() {
         {/* MEDBLOCKS CONSENT & PRIVACY CONTROL MODAL */}
         {showConsentModal && (
           <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
               <button
                 onClick={() => setShowConsentModal(false)}
                 className="absolute top-4 right-4 text-slate-600 hover:text-slate-900 font-bold text-base p-1"
@@ -502,23 +527,98 @@ export default function Dashboard() {
                 ✕
               </button>
 
-              <div className="flex items-center gap-2 border-b pb-3">
-                <span className="text-2xl">🔒</span>
-                <div>
-                  <h2 className="text-base font-extrabold text-slate-900">
-                    Patient Consent & Sharing Controls
-                  </h2>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    You maintain 100% control over what FHIR record modules are shared or exported.
-                  </p>
+              <div className="flex items-center justify-between border-b pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🔒</span>
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900">
+                      Privacy & Visibility Controls
+                    </h2>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Toggle component visibility across your dashboard.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border">
+              {/* QUICK HIDE / UNHIDE ALL BUTTONS */}
+              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-700 pl-1">Quick Bulk Toggle:</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAllPrivacyPermissions(true)}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition"
+                  >
+                    👁️ Show All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllPrivacyPermissions(false)}
+                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg transition"
+                  >
+                    🔒 Hide All
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions & Refills</span>
-                    <span className="text-[10px] text-slate-500">Allow sharing medication history</span>
+                    <span className="font-bold text-slate-900 block">💡 "What Changed?" EHR Delta Summary</span>
+                    <span className="text-[10px] text-slate-500">Show AI delta summary since last visit</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareDelta}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareDelta: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">👨‍⚕️ Provider Notes & Action Items</span>
+                    <span className="text-[10px] text-slate-500">Show doctor visit notes and instructions</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareDoctorNotes}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareDoctorNotes: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">🩺 Symptom Log & Visit Prep Agenda</span>
+                    <span className="text-[10px] text-slate-500">Show logged symptoms and AI question generator</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareSymptomPrep}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareSymptomPrep: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">📉 Vital Signs & Trend Chart</span>
+                    <span className="text-[10px] text-slate-500">Show BP, HR, HbA1c and Vitals Chart</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareVitals}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareVitals: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">💊 Active Prescriptions</span>
+                    <span className="text-[10px] text-slate-500">Show medication list & dosage instructions</span>
                   </div>
                   <input
                     type="checkbox"
@@ -528,10 +628,36 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">🧪 Laboratory & Diagnostic Panels</span>
-                    <span className="text-[10px] text-slate-500">Allow sharing lab test values and refs</span>
+                    <span className="font-bold text-slate-900 block">🩺 Active Diagnoses & Explanations</span>
+                    <span className="text-[10px] text-slate-500">Show medical condition history</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareDiagnoses}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareDiagnoses: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">⚠️ Known Drug Allergies</span>
+                    <span className="text-[10px] text-slate-500">Show recorded allergy sensitivities</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareAllergies}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareAllergies: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">🧪 Laboratory Panels</span>
+                    <span className="text-[10px] text-slate-500">Show lab test values and reference ranges</span>
                   </div>
                   <input
                     type="checkbox"
@@ -541,10 +667,36 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">🌙 Sleep & Daily Mood Context</span>
-                    <span className="text-[10px] text-slate-500">Allow sharing wellness log entries</span>
+                    <span className="font-bold text-slate-900 block">🔬 Clinical Trial & Support Matcher</span>
+                    <span className="text-[10px] text-slate-500">Show local trial and community group recommendations</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareTrials}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareTrials: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">📜 Clinical Encounter History</span>
+                    <span className="text-[10px] text-slate-500">Show doctor visit history logs</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareEncounters}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareEncounters: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">🌙 Sleep & Mental Health Grid</span>
+                    <span className="text-[10px] text-slate-500">Show 28-day mood and stress tracking</span>
                   </div>
                   <input
                     type="checkbox"
@@ -554,10 +706,10 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
                     <span className="font-bold text-slate-900 block">🏃‍♂️ Apple Health Activity Telemetry</span>
-                    <span className="text-[10px] text-slate-500">Allow sharing step & HR counts</span>
+                    <span className="text-[10px] text-slate-500">Show step counts and exercise telemetry</span>
                   </div>
                   <input
                     type="checkbox"
@@ -570,7 +722,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setShowConsentModal(false)}
-                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow"
+                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow mt-2"
               >
                 Save Consent Preferences
               </button>
@@ -634,12 +786,16 @@ export default function Dashboard() {
 
                 <div className="bg-rose-50 border border-rose-100 p-2.5 rounded-lg text-xs">
                   <span className="font-bold text-rose-800 block mb-1">⚠️ CRITICAL DRUG ALLERGIES:</span>
-                  {patient.allergies && patient.allergies.length > 0 ? (
-                    patient.allergies.map((a, i) => (
-                      <div key={i} className="text-rose-700 font-semibold">• {a.substance} ({a.reaction})</div>
-                    ))
+                  {consentPermissions.shareAllergies ? (
+                    patient.allergies && patient.allergies.length > 0 ? (
+                      patient.allergies.map((a, i) => (
+                        <div key={i} className="text-rose-700 font-semibold">• {a.substance} ({a.reaction})</div>
+                      ))
+                    ) : (
+                      <div className="text-rose-700 font-semibold">No known drug allergies (NKDA)</div>
+                    )
                   ) : (
-                    <div className="text-rose-700 font-semibold">No known drug allergies (NKDA)</div>
+                    <span className="text-slate-400 italic">🔒 Privacy Redacted by Patient</span>
                   )}
                 </div>
 
@@ -660,7 +816,7 @@ export default function Dashboard() {
                       id: patient?.id || 'P-84920',
                       name: patient?.name || 'Ezekiel Walter',
                       dob: patient?.dob || '1984-05-12',
-                      allergies: patient?.allergies || ['Penicillin', 'Peanuts'],
+                      allergies: consentPermissions.shareAllergies ? (patient?.allergies || ['Penicillin', 'Peanuts']) : ['Redacted'],
                       contact: 'Clara Walter — (555) 234-9988'
                     })} 
                     size={130}
@@ -811,118 +967,141 @@ export default function Dashboard() {
             {patient && (
               <>
                 {patient.whatChangedSummary && (
-                  <div className="bg-blue-50 border border-blue-300 p-4 rounded-xl shadow-sm text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 font-extrabold text-blue-950 uppercase tracking-wide">
-                      <span aria-hidden="true">💡</span> What Changed Since Last Visit?
-                      <span className="text-xs bg-blue-200 text-blue-950 px-2 py-0.5 rounded font-bold">EHR Delta AI</span>
+                  consentPermissions.shareDelta ? (
+                    <div className="bg-blue-50 border border-blue-300 p-4 rounded-xl shadow-sm text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-extrabold text-blue-950 uppercase tracking-wide">
+                        <span aria-hidden="true">💡</span> What Changed Since Last Visit?
+                        <span className="text-xs bg-blue-200 text-blue-950 px-2 py-0.5 rounded font-bold">EHR Delta AI</span>
+                      </div>
+                      <p className="text-slate-800 font-medium leading-relaxed pl-5">
+                        {patient.whatChangedSummary}
+                      </p>
                     </div>
-                    <p className="text-slate-800 font-medium leading-relaxed pl-5">
-                      {patient.whatChangedSummary}
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="p-3 bg-white rounded-xl border border-slate-300 text-center text-xs text-slate-500 italic">
+                      🔒 "What Changed?" AI summary redacted by patient consent.
+                    </div>
+                  )
                 )}
 
                 {patient.doctorNotes && (
-                  <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                        <span>👨‍⚕️ Provider Notes & Visit Summary</span>
+                  consentPermissions.shareDoctorNotes ? (
+                    <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                          <span>👨‍⚕️ Provider Notes & Visit Summary</span>
+                        </h3>
+                        <span className="text-xs font-bold text-indigo-900 bg-indigo-100 px-2.5 py-0.5 rounded-md">
+                          {patient.doctorNotes.doctor} ({patient.doctorNotes.date})
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-800 bg-slate-100 p-3 rounded-lg border border-slate-200 leading-relaxed italic font-medium">
+                        "{patient.doctorNotes.summary}"
+                      </p>
+
+                      {patient.doctorNotes.keyInstructions && patient.doctorNotes.keyInstructions.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide block">
+                            📌 Provider Action Items & Instructions:
+                          </span>
+                          <ul className="space-y-1 text-xs text-slate-800 pl-1 font-medium">
+                            {patient.doctorNotes.keyInstructions.map((instruction, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-indigo-700 font-bold" aria-hidden="true">•</span>
+                                <span>{instruction}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-white rounded-xl border border-slate-300 text-center text-xs text-slate-500 italic">
+                      🔒 Provider Notes & Visit Summary redacted by patient consent.
+                    </div>
+                  )
+                )}
+
+                {/* VITALS SIGNS & CHART WITH PRIVACY TOGGLE */}
+                {consentPermissions.shareVitals ? (
+                  <>
+                    <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                        ⚡ Vital Signs & Body Metrics
                       </h3>
-                      <span className="text-xs font-bold text-indigo-900 bg-indigo-100 px-2.5 py-0.5 rounded-md">
-                        {patient.doctorNotes.doctor} ({patient.doctorNotes.date})
-                      </span>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center">
+                        <div className={`p-2.5 rounded-lg border text-xs ${
+                          patient.vitals.bpStatus === 'warning' 
+                            ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold' 
+                            : 'bg-slate-100 border-slate-200 text-slate-900'
+                        }`}>
+                          <span className="text-xs text-slate-700 font-bold block">BP</span>
+                          <strong className="text-xs block mt-0.5">{patient.vitals.bp}</strong>
+                          {patient.vitals.bpStatus === 'warning' && (
+                            <span className="text-xs font-extrabold text-amber-950 bg-amber-300 px-1.5 rounded block mt-1">⚠️ Elevated</span>
+                          )}
+                        </div>
+
+                        <div className={`p-2.5 rounded-lg border text-xs ${
+                          patient.vitals.hrStatus === 'warning' 
+                            ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold' 
+                            : 'bg-slate-100 border-slate-200 text-slate-900'
+                        }`}>
+                          <span className="text-xs text-slate-700 font-bold block">Heart Rate</span>
+                          <strong className="text-xs block mt-0.5">{patient.vitals.heartRate}</strong>
+                          {patient.vitals.hrStatus === 'warning' && (
+                            <span className="text-xs font-extrabold text-amber-950 bg-amber-300 px-1.5 rounded block mt-1">⚠️ High</span>
+                          )}
+                        </div>
+
+                        <div className={`p-2.5 rounded-lg border text-xs ${
+                          patient.vitals.hba1cStatus === 'warning' 
+                            ? 'bg-rose-100 border-rose-400 text-rose-950 font-bold' 
+                            : 'bg-slate-100 border-slate-200 text-slate-900'
+                        }`}>
+                          <span className="text-xs text-slate-700 font-bold block">HbA1c</span>
+                          <strong className="text-xs block mt-0.5">{patient.vitals.hba1c}</strong>
+                          {patient.vitals.hba1cStatus === 'warning' && (
+                            <span className="text-xs font-extrabold text-rose-950 bg-rose-300 px-1.5 rounded block mt-1">⚠️ High</span>
+                          )}
+                        </div>
+
+                        <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
+                          <span className="text-xs text-slate-700 font-bold block">SpO₂</span>
+                          <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.spO2 || '98%'}</strong>
+                        </div>
+
+                        <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
+                          <span className="text-xs text-slate-700 font-bold block">Height</span>
+                          <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.height || `5'10"`}</strong>
+                        </div>
+
+                        <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
+                          <span className="text-xs text-slate-700 font-bold block">Weight</span>
+                          <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.weight || `168 lbs`}</strong>
+                        </div>
+
+                        <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs col-span-2 sm:col-span-1">
+                          <span className="text-xs text-slate-700 font-bold block">BMI</span>
+                          <strong className="text-xs text-indigo-900 block mt-0.5 font-bold">{patient.vitals.bmi?.split(' ')[0] || `24.1`}</strong>
+                        </div>
+                      </div>
                     </div>
 
-                    <p className="text-xs text-slate-800 bg-slate-100 p-3 rounded-lg border border-slate-200 leading-relaxed italic font-medium">
-                      "{patient.doctorNotes.summary}"
-                    </p>
-
-                    {patient.doctorNotes.keyInstructions && patient.doctorNotes.keyInstructions.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide block">
-                          📌 Provider Action Items & Instructions:
-                        </span>
-                        <ul className="space-y-1 text-xs text-slate-800 pl-1 font-medium">
-                          {patient.doctorNotes.keyInstructions.map((instruction, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="text-indigo-700 font-bold" aria-hidden="true">•</span>
-                              <span>{instruction}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    <VitalsChart vitalsHistory={(patient as any)?.vitalsHistory} />
+                  </>
+                ) : (
+                  <div className="p-6 bg-white rounded-xl border border-slate-300 text-center space-y-1">
+                    <span className="text-2xl">🔒</span>
+                    <p className="text-xs font-bold text-slate-800">Vital Signs & Chart Redacted</p>
+                    <p className="text-[11px] text-slate-500">Hidden via Privacy Controls.</p>
                   </div>
                 )}
 
-                <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                    ⚡ Vital Signs & Body Metrics
-                  </h3>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center">
-                    <div className={`p-2.5 rounded-lg border text-xs ${
-                      patient.vitals.bpStatus === 'warning' 
-                        ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold' 
-                        : 'bg-slate-100 border-slate-200 text-slate-900'
-                    }`}>
-                      <span className="text-xs text-slate-700 font-bold block">BP</span>
-                      <strong className="text-xs block mt-0.5">{patient.vitals.bp}</strong>
-                      {patient.vitals.bpStatus === 'warning' && (
-                        <span className="text-xs font-extrabold text-amber-950 bg-amber-300 px-1.5 rounded block mt-1">⚠️ Elevated</span>
-                      )}
-                    </div>
-
-                    <div className={`p-2.5 rounded-lg border text-xs ${
-                      patient.vitals.hrStatus === 'warning' 
-                        ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold' 
-                        : 'bg-slate-100 border-slate-200 text-slate-900'
-                    }`}>
-                      <span className="text-xs text-slate-700 font-bold block">Heart Rate</span>
-                      <strong className="text-xs block mt-0.5">{patient.vitals.heartRate}</strong>
-                      {patient.vitals.hrStatus === 'warning' && (
-                        <span className="text-xs font-extrabold text-amber-950 bg-amber-300 px-1.5 rounded block mt-1">⚠️ High</span>
-                      )}
-                    </div>
-
-                    <div className={`p-2.5 rounded-lg border text-xs ${
-                      patient.vitals.hba1cStatus === 'warning' 
-                        ? 'bg-rose-100 border-rose-400 text-rose-950 font-bold' 
-                        : 'bg-slate-100 border-slate-200 text-slate-900'
-                    }`}>
-                      <span className="text-xs text-slate-700 font-bold block">HbA1c</span>
-                      <strong className="text-xs block mt-0.5">{patient.vitals.hba1c}</strong>
-                      {patient.vitals.hba1cStatus === 'warning' && (
-                        <span className="text-xs font-extrabold text-rose-950 bg-rose-300 px-1.5 rounded block mt-1">⚠️ High</span>
-                      )}
-                    </div>
-
-                    <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
-                      <span className="text-xs text-slate-700 font-bold block">SpO₂</span>
-                      <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.spO2 || '98%'}</strong>
-                    </div>
-
-                    <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
-                      <span className="text-xs text-slate-700 font-bold block">Height</span>
-                      <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.height || `5'10"`}</strong>
-                    </div>
-
-                    <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
-                      <span className="text-xs text-slate-700 font-bold block">Weight</span>
-                      <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.weight || `168 lbs`}</strong>
-                    </div>
-
-                    <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs col-span-2 sm:col-span-1">
-                      <span className="text-xs text-slate-700 font-bold block">BMI</span>
-                      <strong className="text-xs text-indigo-900 block mt-0.5 font-bold">{patient.vitals.bmi?.split(' ')[0] || `24.1`}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <VitalsChart vitalsHistory={(patient as any)?.vitalsHistory} />
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* ACTIVE PRESCRIPTIONS CARD WITH CONSENT CONTROL */}
+                  {/* ACTIVE PRESCRIPTIONS */}
                   <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3 md:col-span-1">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex justify-between">
                       <span>💊 Active Prescriptions</span>
@@ -942,97 +1121,119 @@ export default function Dashboard() {
                         ))
                       ) : (
                         <div className="p-4 bg-slate-100 text-center rounded-lg border text-xs text-slate-500 italic">
-                          🔒 Prescriptions redacted by patient consent preference.
+                          🔒 Prescriptions redacted by patient consent.
                         </div>
                       )}
                     </div>
                   </div>
 
+                  {/* ACTIVE DIAGNOSES */}
                   <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3 md:col-span-1">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex justify-between">
                       <span>🩺 Active Diagnoses</span>
                       <span className="text-indigo-800 font-bold">{patient.conditions?.length || 0} recorded</span>
                     </h3>
                     <div className="space-y-2">
-                      {patient.conditions?.map((cond: any, i: number) => {
-                        const rawName = typeof cond === 'string' ? cond : cond.name || 'Condition';
-                        const plainEnglish = typeof cond === 'object' && cond.plainEnglish
-                          ? cond.plainEnglish
-                          : CONDITION_TRANSLATIONS[rawName] || 'A recorded medical condition requiring routine monitoring.';
+                      {consentPermissions.shareDiagnoses ? (
+                        patient.conditions?.map((cond: any, i: number) => {
+                          const rawName = typeof cond === 'string' ? cond : cond.name || 'Condition';
+                          const plainEnglish = typeof cond === 'object' && cond.plainEnglish
+                            ? cond.plainEnglish
+                            : CONDITION_TRANSLATIONS[rawName] || 'A recorded medical condition requiring routine monitoring.';
 
-                        return (
-                          <div key={i} className="bg-slate-100 border border-slate-200 p-2.5 rounded-lg space-y-1">
-                            <div className="text-xs font-bold text-slate-950">• {rawName}</div>
-                            <p className="text-xs text-slate-800 pt-0.5">
-                              <strong className="text-indigo-950 font-bold">In simple terms: </strong>
-                              {plainEnglish}
-                            </p>
-                          </div>
-                        );
-                      })}
+                          return (
+                            <div key={i} className="bg-slate-100 border border-slate-200 p-2.5 rounded-lg space-y-1">
+                              <div className="text-xs font-bold text-slate-950">• {rawName}</div>
+                              <p className="text-xs text-slate-800 pt-0.5">
+                                <strong className="text-indigo-950 font-bold">In simple terms: </strong>
+                                {plainEnglish}
+                              </p>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 bg-slate-100 text-center rounded-lg border text-xs text-slate-500 italic">
+                          🔒 Diagnoses redacted by patient consent.
+                        </div>
+                      )}
                     </div>
                   </div>
 
+                  {/* ALLERGIES */}
                   <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3 md:col-span-1">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex justify-between">
                       <span>⚠️ Known Allergies</span>
                       <span className="text-rose-800 font-bold">{patient.allergies?.length || 0} recorded</span>
                     </h3>
                     <div className="space-y-2">
-                      {patient.allergies && patient.allergies.length > 0 ? (
-                        patient.allergies.map((alg, i) => (
-                          <div
-                            key={i}
-                            className={`p-2.5 rounded-lg border text-xs space-y-1 ${
-                              alg.severity === 'High'
-                                ? 'bg-rose-100 border-rose-300 text-rose-950 font-semibold'
-                                : 'bg-amber-100 border-amber-300 text-amber-950 font-semibold'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center font-extrabold">
-                              <span>🚫 {alg.substance}</span>
-                              <span className="text-xs bg-rose-300 text-rose-950 px-1.5 py-0.5 rounded font-bold uppercase">
-                                {alg.severity}
-                              </span>
+                      {consentPermissions.shareAllergies ? (
+                        patient.allergies && patient.allergies.length > 0 ? (
+                          patient.allergies.map((alg, i) => (
+                            <div
+                              key={i}
+                              className={`p-2.5 rounded-lg border text-xs space-y-1 ${
+                                alg.severity === 'High'
+                                  ? 'bg-rose-100 border-rose-300 text-rose-950 font-semibold'
+                                  : 'bg-amber-100 border-amber-300 text-amber-950 font-semibold'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center font-extrabold">
+                                <span>🚫 {alg.substance}</span>
+                                <span className="text-xs bg-rose-300 text-rose-950 px-1.5 py-0.5 rounded font-bold uppercase">
+                                  {alg.severity}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-900">Reaction: {alg.reaction}</p>
                             </div>
-                            <p className="text-xs text-slate-900">Reaction: {alg.reaction}</p>
+                          ))
+                        ) : (
+                          <div className="bg-emerald-100 border border-emerald-300 p-3 rounded-lg text-emerald-950 text-xs font-bold">
+                            <strong className="block text-xs">✅ NKDA</strong>
+                            <span className="text-xs text-emerald-900 font-medium">No Known Drug Allergies on file.</span>
                           </div>
-                        ))
+                        )
                       ) : (
-                        <div className="bg-emerald-100 border border-emerald-300 p-3 rounded-lg text-emerald-950 text-xs font-bold">
-                          <strong className="block text-xs">✅ NKDA</strong>
-                          <span className="text-xs text-emerald-900 font-medium">No Known Drug Allergies on file.</span>
+                        <div className="p-4 bg-slate-100 text-center rounded-lg border text-xs text-slate-500 italic">
+                          🔒 Allergies redacted by patient consent.
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-2.5">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center justify-between">
-                    <span>🔬 Clinical Trial & Support Program Matcher</span>
-                    <span className="text-xs bg-purple-200 text-purple-950 px-2.5 py-0.5 rounded font-bold">Matched to EHR</span>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium">
-                    <div className="bg-purple-100/60 border border-purple-300 p-3 rounded-lg space-y-1">
-                      <div className="font-extrabold text-purple-950 flex justify-between">
-                        <span>🧪 Active Local Clinical Trial</span>
-                        <span className="text-xs text-emerald-950 bg-emerald-300 px-1.5 py-0.5 rounded font-bold">Eligible</span>
+                {/* CLINICAL TRIALS & SUPPORT MATCHER */}
+                {consentPermissions.shareTrials ? (
+                  <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-2.5">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center justify-between">
+                      <span>🔬 Clinical Trial & Support Program Matcher</span>
+                      <span className="text-xs bg-purple-200 text-purple-950 px-2.5 py-0.5 rounded font-bold">Matched to EHR</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium">
+                      <div className="bg-purple-100/60 border border-purple-300 p-3 rounded-lg space-y-1">
+                        <div className="font-extrabold text-purple-950 flex justify-between">
+                          <span>🧪 Active Local Clinical Trial</span>
+                          <span className="text-xs text-emerald-950 bg-emerald-300 px-1.5 py-0.5 rounded font-bold">Eligible</span>
+                        </div>
+                        <p className="text-xs text-slate-800">Non-Invasive Continuous Glucose & BP Study (Phase II)</p>
                       </div>
-                      <p className="text-xs text-slate-800">Non-Invasive Continuous Glucose & BP Study (Phase II)</p>
-                    </div>
 
-                    <div className="bg-indigo-100/60 border border-indigo-300 p-3 rounded-lg space-y-1">
-                      <div className="font-extrabold text-indigo-950 flex justify-between">
-                        <span>🤝 Local Community Program</span>
-                        <span className="text-xs text-indigo-950 bg-indigo-200 px-1.5 py-0.5 rounded font-bold">Free Workshop</span>
+                      <div className="bg-indigo-100/60 border border-indigo-300 p-3 rounded-lg space-y-1">
+                        <div className="font-extrabold text-indigo-950 flex justify-between">
+                          <span>🤝 Local Community Program</span>
+                          <span className="text-xs text-indigo-950 bg-indigo-200 px-1.5 py-0.5 rounded font-bold">Free Workshop</span>
+                        </div>
+                        <p className="text-xs text-slate-800">Diabetic Nutrition & Hypertension Wellness Group in {patient.location}</p>
                       </div>
-                      <p className="text-xs text-slate-800">Diabetic Nutrition & Hypertension Wellness Group in {patient.location}</p>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-white rounded-xl border border-slate-300 text-center text-xs text-slate-500 italic">
+                    🔒 Clinical Trial & Support Program Matcher redacted by patient consent.
+                  </div>
+                )}
 
                 <div className="space-y-2 pt-2">
+                  {/* LABS ACCORDION */}
                   <div className="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
                     <button
                       onClick={() => setShowLabs(!showLabs)}
@@ -1080,6 +1281,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
+                  {/* ENCOUNTERS ACCORDION */}
                   <div className="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
                     <button
                       onClick={() => setShowEncounters(!showEncounters)}
@@ -1093,15 +1295,21 @@ export default function Dashboard() {
 
                     {showEncounters && (
                       <div id="encounters-accordion-content" className="p-3 border-t border-slate-200 space-y-2">
-                        {patient.encounters?.map((enc, i) => (
-                          <div key={i} className="bg-slate-100 p-2.5 rounded-lg text-xs space-y-1">
-                            <div className="flex justify-between font-bold text-slate-900">
-                              <span>🏥 {enc.type}</span>
-                              <span className="text-slate-700 font-medium">{enc.date}</span>
+                        {consentPermissions.shareEncounters ? (
+                          patient.encounters?.map((enc, i) => (
+                            <div key={i} className="bg-slate-100 p-2.5 rounded-lg text-xs space-y-1">
+                              <div className="flex justify-between font-bold text-slate-900">
+                                <span>🏥 {enc.type}</span>
+                                <span className="text-slate-700 font-medium">{enc.date}</span>
+                              </div>
+                              <p className="text-slate-800 text-xs font-medium">{enc.summary}</p>
                             </div>
-                            <p className="text-slate-800 text-xs font-medium">{enc.summary}</p>
+                          ))
+                        ) : (
+                          <div className="p-4 bg-slate-100 text-center rounded-lg border text-xs text-slate-500 italic">
+                            🔒 Clinical encounters redacted by patient consent.
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
@@ -1113,157 +1321,169 @@ export default function Dashboard() {
 
         {/* TAB 2 */}
         {activeTab === 'symptoms' && (
-          <section aria-label="Symptom Logging & Visit Preparation" className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
-            {patient && (
-              <div className="bg-slate-950 text-white p-3.5 rounded-lg flex items-center justify-between text-xs font-medium">
-                <span className="text-indigo-200 font-bold">👤 Preparing Agenda for: <strong className="text-white">{patient.name}</strong> ({patient.age}y {patient.gender}, {patient.location})</span>
-                <span className="text-slate-300">Next Visit: {patient.nextVisit?.date || 'N/A'}</span>
-              </div>
-            )}
-
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Log Concerns & Prepare for Visit</h2>
-              <p className="text-xs text-slate-700 mt-0.5 font-medium">
-                Add health concerns to generate tailored questions for your doctor.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-xs font-bold text-slate-700">Quick Add Common Symptoms:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_ADD_SYMPTOMS.map((chip, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleAddSymptom(undefined, chip)}
-                    aria-label={`Quick add symptom ${chip}`}
-                    className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-bold px-3 py-1 rounded-full transition"
-                  >
-                    + {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleAddSymptom} className="space-y-3 bg-slate-100 p-4 rounded-xl border border-slate-300">
-              <label htmlFor="symptom-input" className="text-xs font-bold text-slate-800 block">
-                Describe your health issue or symptom:
-              </label>
-              <input
-                id="symptom-input"
-                type="text"
-                value={newSymptomInput}
-                onChange={(e) => setNewSymptomInput(e.target.value)}
-                placeholder="e.g., Lower back tightness after sitting 30 mins"
-                className="w-full px-3 py-2 text-xs bg-white text-slate-900 font-medium rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-              />
-
-              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between text-xs">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <label htmlFor="severity-select" className="sr-only">Symptom Severity</label>
-                    <select
-                      id="severity-select"
-                      value={selectedSeverity}
-                      onChange={(e) => setSelectedSeverity(e.target.value as any)}
-                      className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                    >
-                      <option value="Mild">🟢 Mild</option>
-                      <option value="Moderate">🟡 Moderate</option>
-                      <option value="Severe">🔴 Severe</option>
-                    </select>
+          <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
+            {consentPermissions.shareSymptomPrep ? (
+              <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
+                {patient && (
+                  <div className="bg-slate-950 text-white p-3.5 rounded-lg flex items-center justify-between text-xs font-medium">
+                    <span className="text-indigo-200 font-bold">👤 Preparing Agenda for: <strong className="text-white">{patient.name}</strong> ({patient.age}y {patient.gender}, {patient.location})</span>
+                    <span className="text-slate-300">Next Visit: {patient.nextVisit?.date || 'N/A'}</span>
                   </div>
+                )}
 
-                  <div>
-                    <label htmlFor="duration-select" className="sr-only">Symptom Duration</label>
-                    <select
-                      id="duration-select"
-                      value={selectedDuration}
-                      onChange={(e) => setSelectedDuration(e.target.value as any)}
-                      className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                    >
-                      <option value="< 24 hrs">&lt; 24 hrs</option>
-                      <option value="2-3 days">2-3 days</option>
-                      <option value="1+ weeks">1+ weeks</option>
-                      <option value="Chronic">Chronic</option>
-                    </select>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Log Concerns & Prepare for Visit</h2>
+                  <p className="text-xs text-slate-700 mt-0.5 font-medium">
+                    Add health concerns to generate tailored questions for your doctor.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-700">Quick Add Common Symptoms:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUICK_ADD_SYMPTOMS.map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleAddSymptom(undefined, chip)}
+                        aria-label={`Quick add symptom ${chip}`}
+                        className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-bold px-3 py-1 rounded-full transition"
+                      >
+                        + {chip}
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                <form onSubmit={handleAddSymptom} className="space-y-3 bg-slate-100 p-4 rounded-xl border border-slate-300">
+                  <label htmlFor="symptom-input" className="text-xs font-bold text-slate-800 block">
+                    Describe your health issue or symptom:
+                  </label>
+                  <input
+                    id="symptom-input"
+                    type="text"
+                    value={newSymptomInput}
+                    onChange={(e) => setNewSymptomInput(e.target.value)}
+                    placeholder="e.g., Lower back tightness after sitting 30 mins"
+                    className="w-full px-3 py-2 text-xs bg-white text-slate-900 font-medium rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+
+                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <label htmlFor="severity-select" className="sr-only">Symptom Severity</label>
+                        <select
+                          id="severity-select"
+                          value={selectedSeverity}
+                          onChange={(e) => setSelectedSeverity(e.target.value as any)}
+                          className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                        >
+                          <option value="Mild">🟢 Mild</option>
+                          <option value="Moderate">🟡 Moderate</option>
+                          <option value="Severe">🔴 Severe</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="duration-select" className="sr-only">Symptom Duration</label>
+                        <select
+                          id="duration-select"
+                          value={selectedDuration}
+                          onChange={(e) => setSelectedDuration(e.target.value as any)}
+                          className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                        >
+                          <option value="< 24 hrs">&lt; 24 hrs</option>
+                          <option value="2-3 days">2-3 days</option>
+                          <option value="1+ weeks">1+ weeks</option>
+                          <option value="Chronic">Chronic</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition"
+                    >
+                      + Add Issue
+                    </button>
+                  </div>
+                </form>
+
+                <div className="space-y-2">
+                  {symptoms.map((symptom, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-300 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900">• {symptom.text}</span>
+                        <span className="ml-2 text-xs font-semibold text-slate-700">[{symptom.severity} | {symptom.duration}]</span>
+                      </div>
+                      <button 
+                        onClick={() => handleRemoveSymptom(idx)} 
+                        aria-label={`Remove symptom ${symptom.text}`}
+                        className="text-slate-600 hover:text-rose-700 font-bold text-xs p-1"
+                      >
+                        ✕ Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
                 <button
-                  type="submit"
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition"
+                  onClick={handleGenerateQuestions}
+                  disabled={isLoadingQuestions}
+                  aria-label="Generate AI Doctor Prep Questions using MCP"
+                  className="w-full bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl transition text-xs shadow-sm"
                 >
-                  + Add Issue
+                  {isLoadingQuestions ? 'Generating via MCP Tools...' : '✨ Generate Doctor Prep Questions'}
                 </button>
+
+                {generatedQuestions && (
+                  <div ref={pdfRef} className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-extrabold text-indigo-950">Recommended Doctor Questions:</h3>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={handleCopySummary} 
+                          aria-label="Copy generated questions to clipboard"
+                          className="text-xs bg-white text-indigo-900 px-3 py-1 rounded-md border border-indigo-300 font-bold"
+                        >
+                          {copied ? '✅ Copied' : '📋 Copy'}
+                        </button>
+                        <button 
+                          onClick={handleDownloadPDF} 
+                          aria-label="Download agenda as PDF"
+                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded-md font-bold transition"
+                        >
+                          📥 Download PDF
+                        </button>
+                        <button 
+                          onClick={handlePrintAgenda} 
+                          aria-label="Print appointment agenda"
+                          className="text-xs bg-indigo-700 text-white px-3 py-1 rounded-md font-bold"
+                        >
+                          🖨️ Print Agenda
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-indigo-950 font-medium whitespace-pre-line leading-relaxed">
+                      {generatedQuestions}
+                    </div>
+                  </div>
+                )}
               </div>
-            </form>
-
-            <div className="space-y-2">
-              {symptoms.map((symptom, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-300 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-900">• {symptom.text}</span>
-                    <span className="ml-2 text-xs font-semibold text-slate-700">[{symptom.severity} | {symptom.duration}]</span>
-                  </div>
-                  <button 
-                    onClick={() => handleRemoveSymptom(idx)} 
-                    aria-label={`Remove symptom ${symptom.text}`}
-                    className="text-slate-600 hover:text-rose-700 font-bold text-xs p-1"
-                  >
-                    ✕ Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleGenerateQuestions}
-              disabled={isLoadingQuestions}
-              aria-label="Generate AI Doctor Prep Questions using MCP"
-              className="w-full bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl transition text-xs shadow-sm"
-            >
-              {isLoadingQuestions ? 'Generating via MCP Tools...' : '✨ Generate Doctor Prep Questions'}
-            </button>
-
-            {generatedQuestions && (
-              <div ref={pdfRef} className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold text-indigo-950">Recommended Doctor Questions:</h3>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleCopySummary} 
-                      aria-label="Copy generated questions to clipboard"
-                      className="text-xs bg-white text-indigo-900 px-3 py-1 rounded-md border border-indigo-300 font-bold"
-                    >
-                      {copied ? '✅ Copied' : '📋 Copy'}
-                    </button>
-                    <button 
-                      onClick={handleDownloadPDF} 
-                      aria-label="Download agenda as PDF"
-                      className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded-md font-bold transition"
-                    >
-                      📥 Download PDF
-                    </button>
-                    <button 
-                      onClick={handlePrintAgenda} 
-                      aria-label="Print appointment agenda"
-                      className="text-xs bg-indigo-700 text-white px-3 py-1 rounded-md font-bold"
-                    >
-                      🖨️ Print Agenda
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-xs text-indigo-950 font-medium whitespace-pre-line leading-relaxed">
-                  {generatedQuestions}
-                </div>
+            ) : (
+              <div className="bg-white p-8 text-center rounded-xl border border-slate-300 space-y-2">
+                <span className="text-3xl">🔒</span>
+                <h3 className="text-sm font-bold text-slate-900">Symptom Log & Doctor Prep Redacted</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  This section has been set to private via Patient Privacy Controls. Click "🔒 Privacy Controls" in the header to modify permissions.
+                </p>
               </div>
             )}
           </section>
         )}
 
-        {/* TAB 3: DYNAMIC ROLLING 28-DAY CALENDAR WITH PRIVACY CONSENT */}
+        {/* TAB 3: DYNAMIC ROLLING 28-DAY CALENDAR */}
         {activeTab === 'wellness' && (
           <section aria-label="Sleep & Daily Calendar Tracking" className="space-y-4">
             {consentPermissions.shareMentalHealth ? (
@@ -1440,7 +1660,7 @@ export default function Dashboard() {
                 <span className="text-3xl">🔒</span>
                 <h3 className="text-sm font-bold text-slate-900">Sleep & Mental Health Module Redacted</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  This section has been set to private via Patient Privacy Controls. Click "🔒 Privacy Controls" in the header to allow sharing.
+                  This section has been set to private via Patient Privacy Controls. Click "🔒 Privacy Controls" in the header to modify permissions.
                 </p>
               </div>
             )}
