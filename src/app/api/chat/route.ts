@@ -6,8 +6,15 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]?.text || '';
     const lower = lastMessage.toLowerCase();
 
-    // 1. FAST LOCAL INTENT MATCHING (Guarantees zero failures for demo questions)
-    
+    // 1. FAST LOCAL INTENT MATCHING
+
+    // 💊 Missed Medication / Forget Dose Follow-up
+    if (lower.includes('forget') || lower.includes('missed') || lower.includes('forgot') || lower.includes('skip')) {
+      return NextResponse.json({
+        reply: "If you forget to take a dose, generally take it as soon as you remember unless it's almost time for your next scheduled dose. Never double up doses. For specific guidelines on your prescriptions (like Lisinopril or Metformin), please consult your pharmacist or Dr. Vance!"
+      });
+    }
+
     // 🎂 Birthday / DOB
     if (lower.includes('birthday') || lower.includes('dob') || lower.includes('date of birth') || lower.includes('when was i born')) {
       return NextResponse.json({
@@ -26,7 +33,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 💊 Medications
+    // 💊 Active Medications List
     if (lower.includes('medication') || lower.includes('meds') || lower.includes('prescription') || lower.includes('pills')) {
       const medList = patient?.medications?.map((m: any) => `${m.name} (${m.instructions})`).join(', ');
       return NextResponse.json({
@@ -51,11 +58,19 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. LLM FALLBACK (Used for open-ended queries if OPENAI_API_KEY is available)
+    // 🧪 Labs / Test Results
+    if (lower.includes('lab') || lower.includes('test') || lower.includes('blood work') || lower.includes('results')) {
+      const labList = patient?.labs?.map((l: any) => `${l.testName}: ${l.value} (${l.status})`).join(', ');
+      return NextResponse.json({
+        reply: labList ? `Your recent lab results are: ${labList}.` : "No recent lab results found on file."
+      });
+    }
+
+    // 2. LLM FALLBACK (If OPENAI_API_KEY is configured in Vercel / .env.local)
     if (process.env.OPENAI_API_KEY) {
-      const systemPrompt = `You are Pulse Companion AI, a helpful health assistant.
-Patient Record: Name: ${patient?.name}, DOB: ${patient?.dob}, Primary Doctor: ${patient?.primaryDoctor}, Next Visit: ${patient?.nextVisit?.date}.
-Answer concisely and accurately based on their record.`;
+      const systemPrompt = `You are Pulse Companion AI, an empathetic health assistant.
+Patient Context: Name: ${patient?.name}, DOB: ${patient?.dob}, Medications: ${JSON.stringify(patient?.medications || [])}.
+Answer the user's question concisely, accurately, and accessibly.`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -83,15 +98,22 @@ Answer concisely and accurately based on their record.`;
       }
     }
 
-    // 3. SAFE CALENDAR LOG FALLBACK
+    // 3. CALENDAR LOGGING (Only if user explicitly mentions logging or a symptom)
+    if (lower.includes('feel') || lower.includes('pain') || lower.includes('hurt') || lower.includes('took') || lower.includes('log')) {
+      return NextResponse.json({
+        reply: `Logged entry for ${selectedDateLabel}: "${lastMessage}". Your calendar record has been updated.`
+      });
+    }
+
+    // Default friendly response
     return NextResponse.json({
-      reply: `Logged entry for ${selectedDateLabel}: "${lastMessage}". Your record has been updated.`
+      reply: "I'm here to help with your health records! You can ask about your medications, missed doses, birthday, doctor visits, or lab results."
     });
 
   } catch (error) {
     console.error('Chat API Error:', error);
     return NextResponse.json({
-      reply: "I am ready to assist with your records. Ask me about your birthday, medications, or upcoming visits!"
+      reply: "I am ready to assist with your records. Ask me about your medications, missed doses, or upcoming visits!"
     });
   }
 }
