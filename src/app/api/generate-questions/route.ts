@@ -29,26 +29,27 @@ export async function POST(req: Request) {
       console.warn('MCP internal tool call bypassed:', e);
     }
 
+    // Prepare symptom list array
+    const symptomList = Array.isArray(symptoms)
+      ? symptoms.map((s: any) => (typeof s === 'string' ? s : s.text || ''))
+      : [];
+
+    // 2. AI Prompt tuned for distinct per-symptom questions
     const prompt = `
-You are a helpful patient advocate assistant. Based on the following patient health inputs and MCP clinical tool checks, draft 3-4 clear, empowering questions for the PATIENT to ask their DOCTOR during their upcoming appointment.
+You are an empowering patient advocate AI assistant. Based on the following patient health inputs and MCP clinical checks, generate 4 distinct, highly actionable questions for the PATIENT to ask their DOCTOR during their appointment.
 
 PATIENT INPUTS:
-- Logged Symptoms: ${symptoms && symptoms.length > 0 ? symptoms.join(', ') : 'None specified'}
+- Logged Symptoms: ${symptomList.length > 0 ? JSON.stringify(symptomList) : 'None specified'}
 - Requested Pre-Visit Items: ${checklist && checklist.length > 0 ? checklist.join(', ') : 'None'}
-- Sleep: ${lifestyle.sleepHours || 7} hours/night (Quality: ${lifestyle.sleepQuality || 'Good'}, 7-Day Avg: ${lifestyle.weeklyAvgSleep || 7} hrs)
-- Mood & Energy: ${lifestyle.mood || 'Neutral'}
-- Stress Level: ${lifestyle.stressLevel || 4} / 10
-- Physical Activity: ${lifestyle.activityLevel || 'Moderate'}
-- Caffeine Intake: ${lifestyle.caffeineIntake || '1-2 cups'}
-- Medication Notes: ${lifestyle.medicationNotes || 'None'}
+- Sleep & Wellness: ${lifestyle?.sleepHours || 7} hrs/night (Avg: ${lifestyle?.weeklyAvgSleep || 7} hrs), Stress: ${lifestyle?.stressLevel || 4}/10, Mood: ${lifestyle?.mood || 'Neutral'}
 - MCP Tool Analysis: ${mcpClinicalInsight || 'Vitals and drug safety verified.'}
 
 RULES FOR GENERATED QUESTIONS:
-1. Every question MUST be written from the first-person perspective ("I", "my", "we").
-2. Include any pre-visit checklist items (e.g. refills, referrals, labs) seamlessly into the questions.
-3. Keep them concise, actionable, and warm.
-
-Return ONLY a numbered list of 3 to 4 patient-to-doctor questions.
+1. Write strictly in FIRST-PERSON perspective ("I", "my", "we").
+2. DO NOT list all symptoms in one giant sentence. 
+3. Address specific symptoms individually—e.g., if "Dizziness" is logged, write a targeted question about blood pressure timing or orthostatic checks. If "Insomnia" is logged, ask about sleep/medication interaction.
+4. Include any pre-visit checklist items (e.g. refills, referrals, bloodwork) naturally.
+5. Return ONLY a numbered list from 1 to 4.
 `;
 
     if (process.env.OPENAI_API_KEY) {
@@ -72,21 +73,54 @@ Return ONLY a numbered list of 3 to 4 patient-to-doctor questions.
       }
     }
 
-    // Dynamic fallback matching Patient -> Doctor perspective
-    const symptomSummary = symptoms && symptoms.length > 0 
-      ? symptoms.map((s: string) => s.split('(')[0].trim()).join(' and ') 
-      : 'my recent health concerns';
-    
-    let fallbackQuestions = `1. "Could my recent ${symptomSummary} be related to my blood pressure or medication dosing?"\n2. "Given my stress level (${lifestyle.stressLevel}/10) and weekly average sleep (${lifestyle.weeklyAvgSleep || lifestyle.sleepHours} hrs/night), are there any specific lifestyle adjustments you'd recommend?"`;
+    // 3. Smart Fallback Logic (When OpenAI Key is absent or offline)
+    const generatedFallbackList: string[] = [];
 
-    if (checklist && checklist.length > 0) {
-      fallbackQuestions += `\n3. "Could we review my records today to process my requests for ${checklist.join(', ')}?"`;
-      fallbackQuestions += `\n4. "What red-flag symptoms should I monitor at home before my next follow-up?"`;
+    if (symptomList.length > 0) {
+      // Primary question for first symptom
+      generatedFallbackList.push(
+        `1. "Could my recent ${symptomList[0]} be directly related to my blood pressure or medication dosing?"`
+      );
+
+      // Dedicated question for second symptom (or sleep/lifestyle)
+      if (symptomList.length > 1) {
+        generatedFallbackList.push(
+          `2. "Since I am also experiencing ${symptomList[1]}, should we run targeted diagnostic checks or adjust my treatment timing?"`
+        );
+      } else {
+        generatedFallbackList.push(
+          `2. "Given my stress level (${lifestyle?.stressLevel || 4}/10) and average sleep (${lifestyle?.weeklyAvgSleep || 7} hrs/night), are there specific lifestyle adjustments you recommend?"`
+        );
+      }
+
+      // Dedicated question for third symptom or checklist items
+      if (symptomList.length > 2) {
+        generatedFallbackList.push(
+          `3. "Is there any risk that ${symptomList[2]} is interacting with my active prescriptions or daily routine?"`
+        );
+      } else if (checklist && checklist.length > 0) {
+        generatedFallbackList.push(
+          `3. "Could we review my records today to process my requests for ${checklist.join(', ')}?"`
+        );
+      } else {
+        generatedFallbackList.push(
+          `3. "Are there any routine blood panels or lab work you recommend we run today for these symptoms?"`
+        );
+      }
     } else {
-      fallbackQuestions += `\n3. "Are there any diagnostic tests or routine blood work you recommend we run today?"\n4. "What red-flag symptoms should I monitor at home before my next follow-up?"`;
+      generatedFallbackList.push(`1. "Are there any routine blood panels or lab work you recommend we run today?"`);
+      generatedFallbackList.push(`2. "Given my stress level (${lifestyle?.stressLevel || 4}/10), are there specific lifestyle adjustments you recommend?"`);
+      generatedFallbackList.push(`3. "Could we review my active prescriptions and upcoming refill schedule?"`);
     }
 
-    return NextResponse.json({ questions: fallbackQuestions, mcpInsight: mcpClinicalInsight });
+    // Always include a red-flag safety question
+    generatedFallbackList.push(`4. "What red-flag symptoms should I monitor at home before my next follow-up visit?"`);
+
+    return NextResponse.json({ 
+      questions: generatedFallbackList.join('\n'), 
+      mcpInsight: mcpClinicalInsight 
+    });
+
   } catch (error: any) {
     console.error('Error generating questions:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
