@@ -33,7 +33,7 @@ export default function PulseChatDrawer({
     {
       id: 'msg-init',
       sender: 'assistant',
-      text: "I'm here to help organize your health records! Ask me about your medications, what lab tests mean, missed doses, birthday, doctor visits, or log notes.",
+      text: "I'm here to help organize your health records! Ask me about your medications, what lab tests mean, missed doses, doctor visits, or log notes.",
       chips: ['What are my vitals?', 'When is my next visit?', 'List my medications'],
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -156,7 +156,7 @@ export default function PulseChatDrawer({
                     {msg.text}
                   </div>
 
-                  {/* 💡 Suggestion Chips (Interactive Quick Buttons) */}
+                  {/* 💡 Suggestion Chips (Polished Legibility & Contrast) */}
                   {msg.sender === 'assistant' && msg.chips && msg.chips.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {msg.chips.map((chipText, i) => (
@@ -164,7 +164,7 @@ export default function PulseChatDrawer({
                           key={i}
                           type="button"
                           onClick={() => handleSendMessage(chipText)}
-                          className="text-[11px] px-2.5 py-1 rounded-full bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/50 transition-all cursor-pointer flex items-center gap-1 shadow-sm font-medium"
+                          className="text-[11px] px-2.5 py-1 rounded-full bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/40 transition-all cursor-pointer flex items-center gap-1 shadow-sm font-medium"
                         >
                           <span>✨</span> {chipText}
                         </button>
@@ -203,8 +203,8 @@ export default function PulseChatDrawer({
               </button>
             </div>
 
-            {/* Red Flag Disclaimer */}
-            <div className="bg-amber-950/40 border-t border-amber-900/40 px-3 py-1.5 text-[10px] text-amber-300/80 font-medium">
+            {/* Softened Disclaimer Banner */}
+            <div className="bg-amber-950/30 border-t border-amber-800/30 px-3 py-1.5 text-[10px] text-amber-300/70 font-medium">
               ⚠️ <strong>Notice:</strong> For preparation only. Not a substitute for professional clinical advice.
             </div>
           </>

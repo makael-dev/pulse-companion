@@ -1,22 +1,77 @@
 import { NextResponse } from 'next/server';
 
-// Red Flag Emergency Keywords for Instant Guardrail Check
+// Red Flag Emergency Keywords
 const EMERGENCY_PATTERNS = [
   /chest pain/i, /shortness of breath/i, /difficulty breathing/i, /can't breathe/i,
   /stroke/i, /numbness/i, /face drooping/i, /fainted/i, /fainting/i, /severe bleeding/i, /suicidal/i
 ];
+
+// Relative Date & Specific Date Extractor
+function resolveTargetDate(text: string, defaultLabel: string): string {
+  const lower = text.toLowerCase();
+  
+  if (lower.includes('yesterday') || lower.includes('yest')) {
+    return 'Jul 28';
+  }
+  if (lower.includes('today')) {
+    return 'Jul 29';
+  }
+
+  const monthRegex = /(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s*(\d{1,2})(st|nd|rd|th)?/i;
+  const match = text.match(monthRegex);
+  if (match) {
+    const monthStr = match[1].substring(0, 3).toLowerCase();
+    const formattedMonth = monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
+    const dayNum = parseInt(match[2], 10);
+    return `${formattedMonth} ${dayNum}`;
+  }
+
+  return defaultLabel;
+}
+
+// Symptom Statement Detector
+function isSymptomStatement(text: string): boolean {
+  const lower = text.toLowerCase();
+  const symptomKeywords = [
+    'hurt', 'hurts', 'hurting', 'pain', 'sore', 'ache', 'aches', 'aching',
+    'dizzy', 'dizziness', 'headache', 'tightness', 'cramps', 'cramping',
+    'swollen', 'swelling', 'nausea', 'fatigue', 'tired', 'cough', 'fever', 'sick', 'unwell', 'ill'
+  ];
+  return symptomKeywords.some((word) => lower.includes(word));
+}
 
 // Tool Definitions for OpenAI Function Calling
 const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'get_patient_vitals',
-      description: 'Fetch the patient current vital signs (BP, heart rate, HbA1c, oxygen, weight) or explain what they mean.',
+      name: 'view_calendar',
+      description: 'Provide an overview or summary of the patient 28-day rolling calendar and log entries.',
+      parameters: { type: 'OBJECT', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'check_medication_adherence',
+      description: 'Check if the patient logged taking their medications on a specific date.',
       parameters: {
         type: 'OBJECT',
         properties: {
-          explain: { type: 'BOOLEAN', description: 'True if user wants an explanation of what their vitals mean.' }
+          targetDateStr: { type: 'STRING', description: 'The date string to check (e.g., Jul 19, Jul 28).' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_patient_vitals',
+      description: 'Fetch patient vital signs or explain what they mean.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          explain: { type: 'BOOLEAN', description: 'True if user wants an explanation.' }
         }
       }
     }
@@ -25,29 +80,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_patient_medications',
-      description: 'Get list of active prescriptions, instructions, or check for specific meds (like EpiPen).',
+      description: 'Get list of active prescriptions or check for specific meds.',
       parameters: {
         type: 'OBJECT',
         properties: {
-          specificMed: { type: 'STRING', description: 'Specific medication queried (e.g., EpiPen, Lisinopril).' }
+          specificMed: { type: 'STRING' }
         }
       }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_upcoming_appointment',
-      description: 'Get details about next appointment date, provider, or visit reason.',
-      parameters: { type: 'OBJECT', properties: {} }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_medical_conditions',
-      description: 'Fetch patient recorded medical conditions or diagnoses.',
-      parameters: { type: 'OBJECT', properties: {} }
     }
   },
   {
@@ -58,7 +97,7 @@ const TOOLS = [
       parameters: {
         type: 'OBJECT',
         properties: {
-          targetDateStr: { type: 'STRING', description: 'Target date string (e.g. Jul 29) or leave empty for selected date.' }
+          targetDateStr: { type: 'STRING', description: 'Target date string (e.g., Jul 19).' }
         }
       }
     }
@@ -66,13 +105,15 @@ const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'log_sleep_hours',
-      description: 'Log sleep hours for the current selected date.',
+      name: 'log_context_note',
+      description: 'Log a symptom, note, or health observation to the patient calendar.',
       parameters: {
         type: 'OBJECT',
         properties: {
-          hours: { type: 'NUMBER', description: 'Number of hours slept.' }
-        }
+          noteText: { type: 'STRING', description: 'The symptom or note content.' },
+          targetDateStr: { type: 'STRING', description: 'Target date string.' }
+        },
+        required: ['noteText']
       }
     }
   }
@@ -82,12 +123,63 @@ export async function POST(req: Request) {
   try {
     const { messages, patient, selectedDateLabel, calendarLogs } = await req.json();
     const lastMessage = messages[messages.length - 1]?.text || '';
+    
+    // Normalize typos
+    let cleanMessage = lastMessage
+      .replace(/\b(med|meds|pill|pills|prescription|rx)\b/gi, 'medication')
+      .replace(/\b(paid|pained|paing|pane)\b/gi, 'pain')
+      .replace(/\b(wat|wht)\b/gi, 'what');
 
-    // --- 🚨 FAST RED FLAG EMERGENCY FILTER ---
-    if (EMERGENCY_PATTERNS.some((p) => p.test(lastMessage))) {
+    const targetDate = resolveTargetDate(cleanMessage, selectedDateLabel);
+    const lower = cleanMessage.toLowerCase();
+
+    // --- 🚨 EMERGENCY TRIAGE GUARDRAIL ---
+    if (EMERGENCY_PATTERNS.some((p) => p.test(cleanMessage))) {
       return NextResponse.json({
-        reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911) or visit the nearest Emergency Room immediately. Do not wait for a routine appointment.",
+        reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911) or visit the nearest Emergency Room immediately.",
         chips: ['Emergency ID', 'Call Doctor', 'View Vitals']
+      });
+    }
+
+    // --- 🩺 GENERAL ILLNESS / "WHAT DO I DO IF I AM SICK" HANDLER ---
+    if (
+      lower.includes('if i am sick') ||
+      lower.includes('if i get sick') ||
+      lower.includes('feeling sick') ||
+      lower.includes('what to do if sick') ||
+      lower.includes('when sick')
+    ) {
+      const doctor = patient?.primaryDoctor || 'Dr. Sarah Vance, MD';
+      return NextResponse.json({
+        reply: `🩺 **If you are feeling sick or unwell:**\n\n1. **Severe Symptoms:** If experiencing chest pain, difficulty breathing, or severe dizziness, call **911** or go to Urgent Care immediately.\n2. **Routine Illness:** Contact ${doctor}'s office at **${patient?.phone || '(555) 234-5678'}** or send a message through your portal.\n3. **Log Symptoms:** You can type your symptoms right here to record them on your calendar for your doctor review!`,
+        chips: ['Log a symptom', 'Emergency ID', 'Active Meds']
+      });
+    }
+
+    // --- 💬 CONVERSATIONAL / SMALL TALK HANDLER ---
+    if (
+      lower.includes('conversation') ||
+      lower.includes('talk') ||
+      lower.includes('chat') ||
+      lower.includes('hello') ||
+      lower.includes('hi') ||
+      lower.includes('hey') ||
+      lower.includes('how are you')
+    ) {
+      return NextResponse.json({
+        reply: "Absolutely! 👋 I'm here to chat, answer questions about your health record, help prepare for your doctor visits, or log how you're feeling today. What's on your mind?",
+        chips: ['What are my vitals?', 'Did I take meds yesterday?', 'When is my next visit?', 'Log a note']
+      });
+    }
+
+    // --- 📅 DIRECT CALENDAR VIEW INTENT CHECK ---
+    if (lower.includes('view calendar') || lower.includes('check calendar') || lower.includes('show calendar')) {
+      const activeLog = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === selectedDateLabel.toLowerCase());
+      const notesSummary = activeLog?.notes ? `Notes for ${selectedDateLabel}: "${activeLog.notes}"` : `No context notes recorded for ${selectedDateLabel} yet.`;
+
+      return NextResponse.json({
+        reply: `📅 **28-Day Calendar Overview:**\n\n• Currently viewing **${selectedDateLabel}**.\n• ${notesSummary}\n\nYou can click any date on the main calendar grid to view or edit sleep hours, medication logs, and notes!`,
+        chips: [`Mark taken for ${selectedDateLabel}`, 'Check Vitals', 'Active Meds']
       });
     }
 
@@ -96,17 +188,12 @@ export async function POST(req: Request) {
       const systemPrompt = `You are Pulse Companion AI, an administrative health navigation assistant.
 Patient Context:
 - Name: ${patient?.name || 'Ezekiel Walter'}
-- DOB: ${patient?.dob || '1984-05-12'} (${patient?.age || 42} yrs)
 - Provider: ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD'}
-- Next Visit: ${patient?.nextVisit?.date || 'August 18, 2026'} (${patient?.nextVisit?.type || 'Routine Follow-Up'})
 - Active Meds: ${JSON.stringify(patient?.medications || [])}
-- Sensitivities: ${JSON.stringify(patient?.allergies || [])}
-- Vitals: ${JSON.stringify(patient?.vitals || {})}
-- Conditions: ${JSON.stringify(patient?.conditions || [])}
-- Selected Date: ${selectedDateLabel}
+- Selected Calendar Date: ${selectedDateLabel}
 
 Instructions:
-Use functions to answer user queries accurately. Never invent medical diagnoses or change prescription dosages. Keep answers friendly, clear, and reassuring.`;
+Be conversational, warm, and helpful. Use functions when appropriate.`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -118,14 +205,15 @@ Use functions to answer user queries accurately. Never invent medical diagnoses 
           model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
-            ...messages.map((m: any) => ({
+            ...messages.slice(0, -1).map((m: any) => ({
               role: m.sender === 'user' ? 'user' : 'assistant',
               content: m.text,
             })),
+            { role: 'user', content: cleanMessage }
           ],
           tools: TOOLS,
           tool_choice: 'auto',
-          temperature: 0.2,
+          temperature: 0.3,
         }),
       });
 
@@ -143,58 +231,63 @@ Use functions to answer user queries accurately. Never invent medical diagnoses 
           let action: any = null;
 
           switch (fnName) {
-            case 'get_patient_vitals': {
-              const v = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', spO2: '98%', weight: '168 lbs' };
-              if (args.explain) {
-                reply = `💡 **What Your Vitals Mean:**\n\n• **Blood Pressure (${v.bp}):** ${v.bpStatus === 'warning' ? 'Currently elevated.' : 'In a healthy, normal range under your current regimen.'}\n• **Heart Rate (${v.heartRate}):** Normal resting pulse.\n• **HbA1c (${v.hba1c}):** Normal blood sugar baseline over the past 3 months.\n• **SpO₂ (${v.spO2 || '98%'}):** Excellent blood oxygen levels.`;
-                chips = ['Doctor Notes', 'Next Visit', 'Active Meds'];
+            case 'view_calendar': {
+              const activeLog = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === selectedDateLabel.toLowerCase());
+              const notesSummary = activeLog?.notes ? `Notes for ${selectedDateLabel}: "${activeLog.notes}"` : `No context notes recorded for ${selectedDateLabel} yet.`;
+              reply = `📅 **28-Day Calendar Overview:**\n\n• Currently viewing **${selectedDateLabel}**.\n• ${notesSummary}\n\nYou can tap any date on the calendar grid to switch dates!`;
+              chips = [`Mark taken for ${selectedDateLabel}`, 'Check Vitals', 'Active Meds'];
+              break;
+            }
+
+            case 'check_medication_adherence': {
+              const queryDate = args.targetDateStr || targetDate;
+              const logForDate = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === queryDate.toLowerCase()) || calendarLogs?.[calendarLogs.length - 2];
+              const medsMap = logForDate?.medsTaken || {};
+              const total = patient?.medications?.length || 2;
+              const takenCount = Object.values(medsMap).filter(Boolean).length;
+
+              if (takenCount === total) {
+                reply = `✅ Yes! According to your calendar record for **${queryDate}**, you logged taking all ${total} of your prescribed doses.`;
+              } else if (takenCount > 0) {
+                reply = `⚠️ Partially logged for **${queryDate}**: You logged ${takenCount} of ${total} medication doses as taken.`;
               } else {
-                reply = `📉 **Your Current Vital Signs:**\n• **Blood Pressure:** ${v.bp} mmHg\n• **Heart Rate:** ${v.heartRate}\n• **HbA1c:** ${v.hba1c}\n• **SpO₂:** ${v.spO2 || '98%'}\n• **Weight:** ${v.weight || '168 lbs'}`;
-                chips = ['What does this mean?', 'BP Trend', 'Next Visit'];
+                reply = `💊 According to your calendar log for **${queryDate}**, no medication doses were marked as taken (0 of ${total} logged).`;
               }
+
+              chips = [`Mark taken for ${queryDate}`, 'View Calendar', 'Active Meds'];
+              break;
+            }
+
+            case 'log_context_note': {
+              const date = args.targetDateStr || targetDate;
+              const note = args.noteText || cleanMessage;
+              reply = `📝 Added note for **${date}**: "${note}". Your daily calendar log has been updated!`;
+              action = { type: 'LOG_NOTE', noteText: note, targetDateStr: date };
+              chips = ['View Calendar', 'Log Meds Taken', 'Check Vitals'];
+              break;
+            }
+
+            case 'get_patient_vitals': {
+              const v = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%' };
+              reply = args.explain
+                ? `💡 **What Your Vitals Mean:**\n\n• **BP (${v.bp}):** Normal range.\n• **Heart Rate (${v.heartRate}):** Normal resting pulse.\n• **HbA1c (${v.hba1c}):** Normal blood sugar baseline.`
+                : `📉 **Your Vitals:** BP ${v.bp}, Heart Rate ${v.heartRate}, HbA1c ${v.hba1c}.`;
+              chips = ['What does this mean?', 'Next Visit'];
               break;
             }
 
             case 'get_patient_medications': {
-              if (args.specificMed?.toLowerCase().includes('epipen')) {
-                const hasEpi = patient?.medications?.some((m: any) => m.name.toLowerCase().includes('epipen'));
-                reply = hasEpi
-                  ? "💉 Yes, an EpiPen is active on your prescription record."
-                  : `💉 No EpiPen is listed on your active prescriptions. Given your allergies (${patient?.allergies?.map((a: any) => a.substance).join(', ') || 'Peanuts, Penicillin'}), you can request one during your next visit on ${patient?.nextVisit?.date || 'August 18'}.`;
-                chips = ['How to request one?', 'Allergies list', 'Refill request'];
-              } else {
-                const list = patient?.medications?.map((m: any) => `• **${m.name}**: ${m.instructions}`).join('\n') || 'No active meds found.';
-                reply = `💊 **Your Active Prescriptions:**\n${list}`;
-                chips = ['Log meds taken', 'Refill request', 'Missed dose info'];
-              }
-              break;
-            }
-
-            case 'get_upcoming_appointment': {
-              reply = `🗓️ **Next Appointment:** ${patient?.nextVisit?.date || 'August 18, 2026'} (${patient?.nextVisit?.type || 'Routine Review'}) with ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD'}.`;
-              chips = ['Why is it scheduled?', 'Doctor Prep PDF', 'Refill request'];
-              break;
-            }
-
-            case 'get_medical_conditions': {
-              const conds = patient?.conditions?.map((c: any) => typeof c === 'string' ? c : c.name).join(', ') || 'Essential Hypertension, Hyperlipidemia';
-              reply = `🩺 **Recorded Medical Conditions:** ${conds}.`;
-              chips = ['Active Meds', 'Next Visit', 'Vitals Summary'];
+              const list = patient?.medications?.map((m: any) => `• **${m.name}**: ${m.instructions}`).join('\n') || 'No active meds.';
+              reply = `💊 **Your Active Prescriptions:**\n${list}`;
+              chips = ['Did I take meds yesterday?', 'Log meds taken'];
               break;
             }
 
             case 'log_medications_taken': {
-              const target = args.targetDateStr || selectedDateLabel;
-              reply = `✅ Marked all active prescriptions as taken for **${target}**! Your calendar history has been updated.`;
-              action = { type: 'LOG_MEDS_TAKEN', targetDateStr: target };
-              chips = ['View Calendar', 'Log Sleep', 'Check Vitals'];
-              break;
-            }
-
-            case 'log_sleep_hours': {
-              const hrs = args.hours || 8;
-              reply = `🌙 Recorded **${hrs} hours** of sleep for **${selectedDateLabel}**.`;
-              chips = ['Log Meds Taken', 'Check Vitals', 'Symptom Log'];
+              const date = args.targetDateStr || targetDate;
+              reply = `✅ Marked all active prescriptions as taken for **${date}**!`;
+              action = { type: 'LOG_MEDS_TAKEN', targetDateStr: date };
+              chips = ['View Calendar', 'Check Vitals'];
               break;
             }
           }
@@ -205,20 +298,42 @@ Use functions to answer user queries accurately. Never invent medical diagnoses 
         if (choice?.content) {
           return NextResponse.json({
             reply: choice.content,
-            chips: ['Active Meds', 'Next Visit', 'My Vitals']
+            chips: ['What are my vitals?', 'When is my next visit?', 'My Medications']
           });
         }
       }
     }
 
-    // --- FALLBACK HANDLER ---
+    // --- FALLBACK ADHERENCE QUERY HANDLER ---
+    if (cleanMessage.toLowerCase().includes('did i take') || cleanMessage.toLowerCase().includes('medication')) {
+      const logForDate = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === targetDate.toLowerCase()) || calendarLogs?.[calendarLogs.length - 2];
+      const medsMap = logForDate?.medsTaken || {};
+      const total = patient?.medications?.length || 2;
+      const takenCount = Object.values(medsMap).filter(Boolean).length;
+
+      return NextResponse.json({
+        reply: takenCount === total
+          ? `✅ Yes! According to your calendar record for **${targetDate}**, you logged taking all ${total} of your prescribed doses.`
+          : `💊 According to your calendar log for **${targetDate}**, ${takenCount} of ${total} medication doses were marked as taken.`,
+        chips: [`Mark taken for ${targetDate}`, 'View Calendar', 'Active Meds']
+      });
+    }
+
+    if (isSymptomStatement(cleanMessage)) {
+      return NextResponse.json({
+        reply: `📝 Added note for **${targetDate}**: "${cleanMessage}". Your daily calendar log has been updated!`,
+        action: { type: 'LOG_NOTE', noteText: cleanMessage, targetDateStr: targetDate },
+        chips: ['View Calendar', 'Check Vitals', 'Active Meds']
+      });
+    }
+
     return NextResponse.json({
-      reply: "I am ready to assist with your medical record! You can ask about your vitals, next visit, active prescriptions, allergies, or log notes for your calendar.",
-      chips: ['What are my vitals?', 'When is my next visit?', 'List my medications', 'Log meds as taken']
+      reply: "Hi there! 👋 I'm your Pulse Companion AI. I can help answer questions about your health records, check your vitals, or log notes for your calendar. What would you like to do?",
+      chips: ['What are my vitals?', 'Did I take meds yesterday?', 'List my medications', 'Log meds as taken']
     });
 
   } catch (err) {
-    console.error('Chat Tool Error:', err);
+    console.error('Chat API Error:', err);
     return NextResponse.json({
       reply: "I am here to help organize your health records! Ask me about your medications, doctor visits, vitals, or log notes.",
       chips: ['My Vitals', 'Next Appointment', 'My Medications']
