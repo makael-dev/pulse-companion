@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
+import SummaryTab from './components/SummaryTab';
+import SymptomTab from './components/SymptomTab';
+import MentalHealthTab from './components/MentalHealthTab';
+import FitnessTab from './components/FitnessTab';
 // Dictionary translator for medical jargon -> plain English
-const CONDITION_TRANSLATIONS: Record<string, string> = {
+export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
   'Hyperlipidemia': 'Elevated cholesterol or fatty lipids in the bloodstream that can build up in arterial walls.',
   'Essential (Primary) Hypertension': 'High blood pressure with no single identifiable cause. Requires routine tracking to protect your heart.',
@@ -22,7 +25,7 @@ const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Chronic Kidney Disease (Stage 2)': 'Mild reduction in kidney filtering ability that requires regular monitoring.',
 };
 // Fitness telemetry data mapped by patient selection
-const PATIENT_FITNESS_DATA: Record<string, { steps: number; stepGoal: number; activeMins: number; minGoal: number; restingHR: number; weeklyAvgHR: number; note: string }> = {
+export const PATIENT_FITNESS_DATA: Record<string, { steps: number; stepGoal: number; activeMins: number; minGoal: number; restingHR: number; weeklyAvgHR: number; note: string }> = {
   'ezekiel-walter': {
     steps: 7420,
     stepGoal: 8000,
