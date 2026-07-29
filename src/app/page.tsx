@@ -8,6 +8,8 @@ import html2canvas from 'html2canvas';
 
 import PulseChatDrawer from './components/PulseChatDrawer';
 import VitalsChart from './components/VitalsChart';
+import LabGaugeModal from './components/LabGaugeModal';
+import AppointmentPrepTimeline from './components/AppointmentPrepTimeline';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
@@ -198,6 +200,9 @@ export default function Dashboard() {
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
 
+  // --- LAB GAUGE MODAL STATE ---
+  const [selectedLab, setSelectedLab] = useState<LabItem | null>(null);
+
   // --- CONSENT & PRIVACY CONTROL STATE ---
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentPermissions, setConsentPermissions] = useState({
@@ -205,6 +210,7 @@ export default function Dashboard() {
     shareDelta: true,
     shareDoctorNotes: true,
     shareSymptomPrep: true,
+    sharePrepTimeline: true, // 👈 Added Checklist to privacy controls
     shareDiagnoses: true,
     shareAllergies: true,
     shareMeds: true,
@@ -221,6 +227,7 @@ export default function Dashboard() {
       shareDelta: showAll,
       shareDoctorNotes: showAll,
       shareSymptomPrep: showAll,
+      sharePrepTimeline: showAll,
       shareDiagnoses: showAll,
       shareAllergies: showAll,
       shareMeds: showAll,
@@ -515,7 +522,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* MEDBLOCKS CONSENT & PRIVACY CONTROL MODAL */}
+        {/* CONSENT & PRIVACY CONTROL MODAL */}
         {showConsentModal && (
           <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
@@ -540,7 +547,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* QUICK HIDE / UNHIDE ALL BUTTONS */}
               <div className="flex items-center justify-between bg-slate-100 p-2 rounded-xl border border-slate-200">
                 <span className="text-xs font-bold text-slate-700 pl-1">Quick Bulk Toggle:</span>
                 <div className="flex gap-2">
@@ -562,6 +568,19 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
+                    <span className="font-bold text-slate-900 block">🗓️ Appointment Prep Checklist</span>
+                    <span className="text-[10px] text-slate-500">Show upcoming appointment countdown checklist</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.sharePrepTimeline}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, sharePrepTimeline: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
                     <span className="font-bold text-slate-900 block">💡 "What Changed?" EHR Delta Summary</span>
@@ -1022,7 +1041,7 @@ export default function Dashboard() {
                   )
                 )}
 
-                {/* VITALS SIGNS & CHART WITH PRIVACY TOGGLE */}
+                {/* VITALS SIGNS & CHART */}
                 {consentPermissions.shareVitals ? (
                   <>
                     <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
@@ -1232,7 +1251,7 @@ export default function Dashboard() {
                 )}
 
                 <div className="space-y-2 pt-2">
-                  {/* LABS ACCORDION */}
+                  {/* LABS ACCORDION WITH CLICKABLE GAUGE TRIGGER */}
                   <div className="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
                     <button
                       onClick={() => setShowLabs(!showLabs)}
@@ -1240,7 +1259,7 @@ export default function Dashboard() {
                       aria-controls="labs-accordion-content"
                       className="w-full p-3.5 text-xs font-extrabold text-slate-800 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition"
                     >
-                      <span>🧪 Recent Lab Panels ({patient.labs?.length || 0} results)</span>
+                      <span>🧪 Recent Lab Panels ({patient.labs?.length || 0} results - Click Any To View Spectrum Gauge)</span>
                       <span aria-hidden="true">{showLabs ? '▲ Hide' : '▼ Expand'}</span>
                     </button>
 
@@ -1252,7 +1271,8 @@ export default function Dashboard() {
                             return (
                               <div
                                 key={i}
-                                className={`p-2.5 rounded-lg border text-xs ${
+                                onClick={() => setSelectedLab(lab)}
+                                className={`p-2.5 rounded-lg border text-xs cursor-pointer transition hover:border-indigo-500 ${
                                   isAbnormal
                                     ? 'bg-amber-100 border-amber-300 text-amber-950 font-bold'
                                     : 'bg-slate-100 border-slate-200 text-slate-900 font-medium'
@@ -1260,11 +1280,9 @@ export default function Dashboard() {
                               >
                                 <div className="font-bold flex justify-between items-center">
                                   <span>{lab.testName}</span>
-                                  {isAbnormal && (
-                                    <span className="text-xs bg-amber-300 text-amber-950 font-extrabold px-1.5 py-0.5 rounded">
-                                      {lab.status}
-                                    </span>
-                                  )}
+                                  <span className="text-[10px] bg-indigo-200 text-indigo-950 px-1.5 py-0.5 rounded font-bold">
+                                    📊 View Gauge
+                                  </span>
                                 </div>
                                 <div className="text-sm font-extrabold mt-0.5">{lab.value}</div>
                                 <div className="text-xs text-slate-700">Ref: {lab.referenceRange}</div>
@@ -1318,9 +1336,18 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 2 */}
+        {/* TAB 2: SYMPTOM LOG, COUNTDOWN TIMELINE & DOCTOR PREP */}
         {activeTab === 'symptoms' && (
           <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
+            {/* 🗓️ Appointment Prep Countdown Checklist (Controlled by Privacy Settings) */}
+            {consentPermissions.sharePrepTimeline ? (
+              <AppointmentPrepTimeline targetDate={patient?.nextVisit?.date || 'August 18, 2026'} />
+            ) : (
+              <div className="p-3 bg-white rounded-xl border border-slate-300 text-center text-xs text-slate-500 italic">
+                🔒 Appointment Prep Checklist redacted by patient consent.
+              </div>
+            )}
+
             {consentPermissions.shareSymptomPrep ? (
               <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
                 {patient && (
@@ -1818,6 +1845,11 @@ export default function Dashboard() {
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
         onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
       />
+
+      {/* 🩻 LAB SPECTRUM GAUGE MODAL */}
+      {selectedLab && (
+        <LabGaugeModal lab={selectedLab} onClose={() => setSelectedLab(null)} />
+      )}
     </div>
   );
 }
