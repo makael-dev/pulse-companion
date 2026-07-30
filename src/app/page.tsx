@@ -192,7 +192,7 @@ function generateRolling28Days(): CalendarDayLog[] {
       notes: '',
       medsTaken: {
         'Lisinopril 10 mg': true,
-        'Metformin 500 mg': i !== 2,
+        'Metformin 500 mg': true,
       },
       workouts: i % 3 === 0 ? [
         { exercise: '1 Mile Run', details: 'Completed 1 mile run' },
@@ -212,8 +212,11 @@ export default function Dashboard() {
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
 
+  // --- DAY SUMMARY POPUP MODAL STATE ---
+  const [dayModalLog, setDayModalLog] = useState<CalendarDayLog | null>(null);
+
   // --- MASTER GAMIFICATION SYSTEM TOGGLE ---
-  const [enableRPGSystem, setEnableRPGSystem] = useState<boolean>(true);
+  const [enableRPGSystem, setEnableRPGSystem] = useState<boolean>(false);
 
   // --- DYNAMIC FITNESS PR STATES ---
   const [deadliftPR, setDeadliftPR] = useState<number>(300);
@@ -238,7 +241,7 @@ export default function Dashboard() {
     shareLabs: true,
     shareMentalHealth: true,
     shareFitness: true,
-    shareRPGStats: true,
+    shareRPGStats: false,
     shareTrials: true,
     shareEncounters: true,
   });
@@ -268,15 +271,32 @@ export default function Dashboard() {
     if (savedSymptoms) {
       try { setSymptoms(JSON.parse(savedSymptoms)); } catch (e) { console.error(e); }
     }
+
+    const freshLogs = generateRolling28Days();
     const savedLogs = localStorage.getItem('pulse_calendar_logs');
+
     if (savedLogs) {
       try {
-        const parsed = JSON.parse(savedLogs);
+        const parsed: CalendarDayLog[] = JSON.parse(savedLogs);
         if (Array.isArray(parsed) && parsed.length === 28) {
-          setCalendarLogs(parsed);
+          const syncedLogs = freshLogs.map((freshDay, idx) => {
+            const cachedDay = parsed[idx];
+            return {
+              ...freshDay,
+              notes: cachedDay?.notes || freshDay.notes,
+              medsTaken: cachedDay?.medsTaken || freshDay.medsTaken,
+              workouts: cachedDay?.workouts || freshDay.workouts,
+              mood: cachedDay?.mood || freshDay.mood,
+              sleepHours: cachedDay?.sleepHours || freshDay.sleepHours,
+            };
+          });
+          setCalendarLogs(syncedLogs);
+          return;
         }
       } catch (e) { console.error(e); }
     }
+
+    setCalendarLogs(freshLogs);
   }, []);
 
   useEffect(() => {
@@ -303,22 +323,9 @@ export default function Dashboard() {
     documentTitle: `${patient?.name || 'Patient'}_Emergency_ID`,
     onAfterPrint: () => setShowEmergencyModal(false),
     pageStyle: `
-      @page {
-        size: portrait;
-        margin: 0;
-      }
-      body {
-        margin: 0 !important;
-        padding: 24px !important;
-        background: white !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: flex-start !important;
-      }
-      html, body {
-        height: 100% !important;
-        overflow: hidden !important;
-      }
+      @page { size: portrait; margin: 0; }
+      body { margin: 0 !important; padding: 24px !important; background: white !important; display: flex !important; justify-content: center !important; align-items: flex-start !important; }
+      html, body { height: 100% !important; overflow: hidden !important; }
     `,
   });
 
@@ -521,10 +528,30 @@ export default function Dashboard() {
   const adherencePercent = totalMedsCount > 0 ? Math.round((takenMedsCount / totalMedsCount) * 100) : 100;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8 max-w-4xl mx-auto font-sans print:bg-white print:p-0 flex flex-col justify-between">
-      <div>
+    <div className="min-h-screen bg-slate-100/80 text-slate-900 font-sans print:bg-white print:p-0 flex flex-col justify-between relative overflow-x-hidden">
+      {/* BACKGROUND AMBIENT GLOWS */}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none -z-10"></div>
+      <div className="fixed top-1/3 right-10 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl pointer-events-none -z-10"></div>
+
+      {/* TOP ANNOUNCEMENT / STATUS BAR */}
+      <div className="bg-slate-900 text-white text-[11px] py-1.5 px-4 print:hidden border-b border-slate-800">
+        <div className="max-w-6xl mx-auto flex items-center justify-between font-medium">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-slate-300">FHIR R4 EHR Gateway Connected</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-indigo-300">Sync Status: Live</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-4 text-slate-400">
+            <span>Encrypted Session</span>
+            <span>ID: {patient?.id || 'P-84920'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-slate-200 gap-3 print:hidden">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-200 gap-3 print:hidden bg-white/70 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <span className="text-indigo-600" aria-hidden="true">💜</span> Pulse Companion
@@ -889,62 +916,62 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Tabs */}
-        <nav aria-label="Dashboard Navigation Tabs" className="flex border-b border-slate-300 mb-6 gap-2 print:hidden">
+        {/* Navigation Tabs (Full Width Grid) */}
+        <nav aria-label="Dashboard Navigation Tabs" className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 print:hidden bg-white/60 p-1.5 rounded-2xl border border-slate-200/80 shadow-sm">
           <button
             onClick={() => setActiveTab('vitals')}
             aria-selected={activeTab === 'vitals'}
             role="tab"
-            className={`pb-3 px-3 text-xs font-bold transition-colors border-b-2 ${
+            className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
               activeTab === 'vitals'
-                ? 'border-indigo-700 text-indigo-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
             }`}
           >
-            📈 Summary & EHR Record
+            <span>📈</span> Summary & EHR Record
           </button>
           <button
             onClick={() => setActiveTab('symptoms')}
             aria-selected={activeTab === 'symptoms'}
             role="tab"
-            className={`pb-3 px-3 text-xs font-bold transition-colors border-b-2 ${
+            className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
               activeTab === 'symptoms'
-                ? 'border-indigo-700 text-indigo-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
             }`}
           >
-            🩺 Symptom Log & Doctor Prep
+            <span>🩺</span> Symptom Log & Doctor Prep
           </button>
           <button
             onClick={() => setActiveTab('wellness')}
             aria-selected={activeTab === 'wellness'}
             role="tab"
-            className={`pb-3 px-3 text-xs font-bold transition-colors border-b-2 ${
+            className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
               activeTab === 'wellness'
-                ? 'border-indigo-700 text-indigo-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
             }`}
           >
-            🌙 Sleep & Mental Health
+            <span>🌙</span> Sleep & Mental Health
           </button>
           <button
             onClick={() => setActiveTab('fitness')}
             aria-selected={activeTab === 'fitness'}
             role="tab"
-            className={`pb-3 px-3 text-xs font-bold transition-colors border-b-2 ${
+            className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
               activeTab === 'fitness'
-                ? 'border-indigo-700 text-indigo-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
             }`}
           >
-            🏃‍♂️ Activity & Fitness Sync
+            <span>🏃‍♂️</span> Activity & Fitness Sync
           </button>
         </nav>
 
         {/* TAB 1 */}
         {activeTab === 'vitals' && (
           <section aria-label="EHR Health Record Overview" className="space-y-4">
-            <div className="bg-indigo-950 text-white p-5 rounded-xl shadow-sm space-y-3">
+            <div className="bg-indigo-950 text-white p-5 rounded-xl shadow-md space-y-3 border border-indigo-900">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div>
                   <span className="text-xs text-indigo-300 uppercase font-bold tracking-wider">EHR Record</span>
@@ -1018,7 +1045,7 @@ export default function Dashboard() {
               <>
                 {patient.whatChangedSummary && (
                   consentPermissions.shareDelta ? (
-                    <div className="bg-blue-50 border border-blue-300 p-4 rounded-xl shadow-sm text-xs space-y-1">
+                    <div className="bg-blue-50/90 border border-blue-300 p-4 rounded-xl shadow-sm text-xs space-y-1 backdrop-blur-sm">
                       <div className="flex items-center gap-1.5 font-extrabold text-blue-950 uppercase tracking-wide">
                         <span aria-hidden="true">💡</span> What Changed Since Last Visit?
                         <span className="text-xs bg-blue-200 text-blue-950 px-2 py-0.5 rounded font-bold">EHR Delta AI</span>
@@ -1546,10 +1573,10 @@ export default function Dashboard() {
           <section aria-label="Sleep & Daily Calendar Tracking" className="space-y-4">
             {consentPermissions.shareMentalHealth ? (
               <>
-                <div className="bg-slate-950 text-white p-4 rounded-xl space-y-3">
+                <div className="bg-slate-950 text-white p-4 rounded-xl space-y-3 border border-slate-800 shadow-md">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                      📅 Rolling 28-Day Calendar Grid (Click Any Day To View/Edit)
+                      📅 Rolling 28-Day Calendar Grid (Click Any Day To View Summary Pop-up)
                     </h3>
                     <span className="text-[10px] bg-indigo-900 text-indigo-200 px-2.5 py-0.5 rounded font-bold">
                       Selected: {activeDayLog.dateStr} ({activeDayLog.dayLabel})
@@ -1566,7 +1593,10 @@ export default function Dashboard() {
                       return (
                         <button
                           key={idx}
-                          onClick={() => setSelectedDateIndex(idx)}
+                          onClick={() => {
+                            setSelectedDateIndex(idx);
+                            setDayModalLog(log); // 👈 Opens summary popup for clicked date
+                          }}
                           className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center relative ${
                             isSelected
                               ? 'bg-indigo-600 border-indigo-400 text-white font-extrabold shadow-md scale-105 z-10'
@@ -1622,11 +1652,11 @@ export default function Dashboard() {
                                   : 'bg-white border-indigo-200 text-slate-800 hover:bg-indigo-100'
                               }`}
                             >
-                              <div className="space-y-0.5">
+                              <div className="space-y-0.5 pr-2">
                                 <span className="text-xs font-bold block">• {med.name}</span>
                                 <span className="text-[10px] text-slate-500 block">{med.instructions}</span>
                               </div>
-                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 ${
                                 isTaken ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
                               }`}>
                                 {isTaken ? '✅ Taken' : '💊 Mark Taken'}
@@ -1923,7 +1953,7 @@ export default function Dashboard() {
       </div>
 
       {/* FOOTER MEDICAL DISCLAIMER */}
-      <footer className="mt-8 pt-4 border-t border-slate-200 text-center text-[11px] text-slate-500 print:hidden space-y-1">
+      <footer className="mt-8 py-4 border-t border-slate-200 bg-white/50 text-center text-[11px] text-slate-500 print:hidden space-y-1">
         <p className="font-semibold text-slate-600">
           ⚠️ Medical Disclaimer
         </p>
@@ -1946,6 +1976,95 @@ export default function Dashboard() {
       {/* 🩻 LAB SPECTRUM GAUGE MODAL */}
       {selectedLab && (
         <LabGaugeModal lab={selectedLab} onClose={() => setSelectedLab(null)} />
+      )}
+
+      {/* 📅 DAILY SNAPSHOT SUMMARY MODAL */}
+      {dayModalLog && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
+            <button
+              onClick={() => setDayModalLog(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
+              <span className="text-2xl">📅</span>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Daily Summary: {dayModalLog.dateStr}
+                </h3>
+                <p className="text-xs text-indigo-600 font-bold">
+                  {dayModalLog.dayLabel === 'Today' ? 'Today' : `${dayModalLog.dayLabel} Summary`}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
+                <span className="font-extrabold text-indigo-950 block">💊 Medications Logged:</span>
+                {dayModalLog.medsTaken && Object.keys(dayModalLog.medsTaken).length > 0 ? (
+                  <div className="space-y-1 pt-1">
+                    {Object.entries(dayModalLog.medsTaken).map(([med, taken], i) => (
+                      <div key={i} className="flex justify-between items-center text-slate-800 font-medium">
+                        <span>• {med}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${taken ? 'bg-emerald-200 text-emerald-950' : 'bg-slate-200 text-slate-600'}`}>
+                          {taken ? '✅ Taken' : '❌ Missed'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 italic block">No medication doses recorded.</span>
+                )}
+              </div>
+
+              <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl space-y-1">
+                <span className="font-extrabold text-purple-950 block">🏋️ Workouts Recorded:</span>
+                {dayModalLog.workouts && dayModalLog.workouts.length > 0 ? (
+                  <div className="space-y-1 pt-1">
+                    {dayModalLog.workouts.map((w, i) => (
+                      <div key={i} className="flex justify-between items-center text-slate-800 font-medium">
+                        <span>• {w.exercise}</span>
+                        <span className="bg-purple-200 text-purple-950 px-2 py-0.5 rounded text-[10px] font-bold">
+                          {w.details}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 italic block">No specific workout logged for this day.</span>
+                )}
+              </div>
+
+              <div className="bg-slate-100 border border-slate-200 p-3 rounded-xl flex items-center justify-between font-medium">
+                <div>
+                  <span className="text-slate-500 block text-[10px] uppercase font-bold">Sleep Duration</span>
+                  <strong className="text-slate-900 text-xs">{dayModalLog.sleepHours} Hours ({dayModalLog.mood})</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block text-[10px] uppercase font-bold">Stress Index</span>
+                  <strong className="text-indigo-900 text-xs">{dayModalLog.stressLevel} / 10</strong>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-1">
+                <span className="font-extrabold text-slate-800 block">✏️ Context Notes:</span>
+                <p className="text-slate-700 italic font-medium whitespace-pre-line">
+                  {dayModalLog.notes ? dayModalLog.notes : 'No context notes written for this date.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setDayModalLog(null)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs transition"
+            >
+              Close Summary
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
