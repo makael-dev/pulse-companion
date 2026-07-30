@@ -218,7 +218,7 @@ export default function Dashboard() {
   // --- EHR CONNECT & MULTI-STEP OAUTH STATE ---
   const [showEHRModal, setShowEHRModal] = useState(false);
   const [linkStep, setLinkStep] = useState<'select' | 'auth' | 'sync'>('select');
-  const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
+  const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('e1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
   
   // STARTS DISCONNECTED (NULL) ON PAGE RELOAD
   const [connectedPortal, setConnectedPortal] = useState<string | null>(null);
@@ -349,8 +349,8 @@ export default function Dashboard() {
   const [caregiverMode, setCaregiverMode] = useState(false);
 
   const [symptoms, setSymptoms] = useState<DetailedSymptom[]>([
-    { text: 'Dizziness when standing up', severity: 'Mild', duration: '2-3 days' },
-    { text: 'Mild headache in the mornings', severity: 'Mild', duration: '1+ weeks' },
+    { text: 'Mild shortness of breath during outdoor jog', severity: 'Mild', duration: '2-3 days' },
+    { text: 'Nasal congestion in the morning', severity: 'Mild', duration: '1+ weeks' },
   ]);
 
   useEffect(() => {
@@ -433,7 +433,6 @@ export default function Dashboard() {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // FETCH PATIENTS FROM API WITHOUT AUTO-SELECTING (KEEPS BLANK ON RELOAD)
   useEffect(() => {
     async function loadPatients() {
       try {
@@ -589,7 +588,7 @@ export default function Dashboard() {
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              {caregiverMode ? '👨‍👩‍👧 Caregiver View Active' : '👤 Patient View'}
+              {caregiverMode ? '👨‍gsub Caregiver View Active' : '👤 Patient View'}
             </button>
 
             <button
@@ -904,10 +903,10 @@ export default function Dashboard() {
                   <QRCodeSVG 
                     value={JSON.stringify({
                       id: patient?.id || 'P-84920',
-                      name: patient?.name || 'Ezekiel Walter',
-                      dob: patient?.dob || '1984-05-12',
-                      allergies: consentPermissions.shareAllergies ? (patient?.allergies || ['Penicillin', 'Peanuts']) : ['Redacted'],
-                      contact: 'Clara Walter — (555) 234-9988'
+                      name: patient?.name || 'Maya Lin',
+                      dob: patient?.dob || '1987-03-22',
+                      allergies: consentPermissions.shareAllergies ? (patient?.allergies || ['Dust Mites']) : ['Redacted'],
+                      contact: 'David Lin — (555) 617-9900'
                     })} 
                     size={130}
                     level="M"
@@ -1035,7 +1034,7 @@ export default function Dashboard() {
                           🗓️ Next Visit: <strong className="text-white">{patient.nextVisit.date}</strong> ({patient.nextVisit.type})
                         </div>
                       )}
-                      <div>👨‍⚕️ Provider: <strong className="text-white">{patient.primaryDoctor || 'Dr. Vance'}</strong></div>
+                      <div>👨‍⚕️ Provider: <strong className="text-white">{patient.primaryDoctor || 'Dr. Thorne'}</strong></div>
                     </div>
                   )}
                 </div>
@@ -1175,17 +1174,17 @@ export default function Dashboard() {
 
                             <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
                               <span className="text-xs text-slate-700 font-bold block">Height</span>
-                              <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.height || `5'10"`}</strong>
+                              <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.height || `5' 6"`}</strong>
                             </div>
 
                             <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs">
                               <span className="text-xs text-slate-700 font-bold block">Weight</span>
-                              <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.weight || `168 lbs`}</strong>
+                              <strong className="text-xs text-slate-950 block mt-0.5 font-bold">{patient.vitals.weight || `135 lbs`}</strong>
                             </div>
 
                             <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-xs col-span-2 sm:col-span-1">
                               <span className="text-xs text-slate-700 font-bold block">BMI</span>
-                              <strong className="text-xs text-indigo-900 block mt-0.5 font-bold">{patient.vitals.bmi?.split(' ')[0] || `24.1`}</strong>
+                              <strong className="text-xs text-indigo-900 block mt-0.5 font-bold">{patient.vitals.bmi?.split(' ')[0] || `21.8`}</strong>
                             </div>
                           </div>
                         </div>
@@ -1314,7 +1313,7 @@ export default function Dashboard() {
                               <span>🧪 Active Local Clinical Trial</span>
                               <span className="text-xs text-emerald-950 bg-emerald-300 px-1.5 py-0.5 rounded font-bold">Eligible</span>
                             </div>
-                            <p className="text-xs text-slate-800">Non-Invasive Continuous Glucose & BP Study (Phase II)</p>
+                            <p className="text-xs text-slate-800">Non-Invasive Asthma & Peak Flow Telemetry Study (Phase II)</p>
                           </div>
 
                           <div className="bg-indigo-100/60 border border-indigo-300 p-3 rounded-lg space-y-1">
@@ -1322,7 +1321,7 @@ export default function Dashboard() {
                               <span>🤝 Local Community Program</span>
                               <span className="text-xs text-indigo-950 bg-indigo-200 px-1.5 py-0.5 rounded font-bold">Free Workshop</span>
                             </div>
-                            <p className="text-xs text-slate-800">Diabetic Nutrition & Hypertension Wellness Group in {patient.location}</p>
+                            <p className="text-xs text-slate-800">Pulmonary Care & Asthma Wellness Group in {patient.location}</p>
                           </div>
                         </div>
                       </div>
@@ -1423,7 +1422,7 @@ export default function Dashboard() {
               <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
                 {/* 🗓️ Appointment Prep Countdown Checklist */}
                 {consentPermissions.sharePrepTimeline ? (
-                  <AppointmentPrepTimeline targetDate={patient?.nextVisit?.date || 'August 18, 2026'} />
+                  <AppointmentPrepTimeline targetDate={patient?.nextVisit?.date || 'October 14, 2026'} />
                 ) : (
                   <div className="p-3 bg-white rounded-xl border border-slate-300 text-center text-xs text-slate-500 italic">
                     🔒 Appointment Prep Checklist redacted by patient consent.
@@ -1472,7 +1471,7 @@ export default function Dashboard() {
                         type="text"
                         value={newSymptomInput}
                         onChange={(e) => setNewSymptomInput(e.target.value)}
-                        placeholder="e.g., Lower back tightness after sitting 30 mins"
+                        placeholder="e.g., Shortness of breath during outdoor exercise"
                         className="w-full px-3 py-2 text-xs bg-white text-slate-900 font-medium rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
                       />
 
@@ -1845,7 +1844,7 @@ export default function Dashboard() {
                             updated[selectedDateIndex].notes = e.target.value;
                             setCalendarLogs(updated);
                           }}
-                          placeholder="e.g. Woke up with mild tightness, took morning Lisinopril at 8:00 AM..."
+                          placeholder="e.g. Woke up with mild shortness of breath, used Albuterol inhaler before morning run..."
                           className="w-full p-3 text-xs bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
                         />
                       </div>
@@ -1868,7 +1867,7 @@ export default function Dashboard() {
               <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
                 {consentPermissions.shareFitness ? (
                   <div className="space-y-4">
-                    {/* 🎮 RPG Video Game Character Stats Sheet (Hides completely when disabled) */}
+                    {/* 🎮 RPG Video Game Character Stats Sheet */}
                     {enableRPGSystem && consentPermissions.shareRPGStats && (
                       <RPGStatsCard 
                         patient={patient} 
@@ -1880,7 +1879,7 @@ export default function Dashboard() {
                       />
                     )}
 
-                    {/* 🏋️ Personal Fitness Records & Demographic Benchmarks */}
+                    {/* 🏋️ Personal Fitness Records & Dynamic Demographic Benchmarks */}
                     <WorkoutTracker 
                       patient={patient} 
                       deadliftPR={deadliftPR}
@@ -1901,7 +1900,7 @@ export default function Dashboard() {
                             🏃‍♂️ Apple Health Telemetry & Daily Activity
                           </h3>
                           <p className="text-xs text-slate-400 mt-1">
-                            Real-time metric syncing to monitor patient compliance with physician walking instructions.
+                            Real-time metric syncing to monitor patient compliance with physician exercise recommendations.
                           </p>
                         </div>
                         <span className="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-full flex items-center gap-1.5">
@@ -1951,12 +1950,13 @@ export default function Dashboard() {
                         </div>
                       </div>
 
+                      {/* DYNAMIC AI SUMMARY FIXING HARDCODED NAMES */}
                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
                         <span className="text-base">💡</span>
                         <div className="text-xs text-slate-300 space-y-1">
                           <strong className="text-white block font-semibold">AI Clinical Telemetry Summary:</strong>
                           <p>
-                            Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery since starting the current Lisinopril regimen.
+                            {patient?.name?.split(' ')[0] || 'The patient'} has met their daily 30-minute exercise target 5 out of the last 7 days. Resting heart rate trends show steady cardiovascular recovery and stable baseline SpO2.
                           </p>
                         </div>
                       </div>

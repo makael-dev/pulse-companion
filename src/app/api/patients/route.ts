@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const apiKey = process.env.MEDBLOCKS_API_KEY || "mb_sk_sbx_YbjtSwvPXXqFVQMrRIjhyaQfchvoYaCFmiroHpqAxRXMtqujspTTXtwcUYzqXlLU";
+  const apiKey = process.env.MEDBLOCKS_API_KEY || "mb_sk_sbx_YbjtSwPXXqFVQmRRiJhyaQfchvoYaCFmiroHpqAxRXMtqujspTTXtwcUYzqXLLU";
 
   try {
-    // 1. Fetch live Patients directly from Medblocks Platform API
     const response = await fetch('https://app.medblocks.com/patients', {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store', // Ensures instant updates when adding new patients in Medblocks
+      cache: 'no-store',
     });
 
     if (response.ok) {
@@ -18,7 +17,6 @@ export async function GET() {
       const rawList = json?.data || json?.patients || (Array.isArray(json) ? json : []);
 
       if (Array.isArray(rawList) && rawList.length > 0) {
-        // 2. Automatically transform every patient from Medblocks into Pulse Companion schema
         const livePatients = rawList.map((p: any) => {
           if (p.vitals && p.medications) {
             return p;
@@ -26,38 +24,43 @@ export async function GET() {
 
           const fullName = p.name || `${p.first_name || p.given_name || ''} ${p.last_name || p.family_name || ''}`.trim() || 'Connected Patient';
           const email = p.email || (fullName ? `${fullName.toLowerCase().replace(/\s+/g, '.')}@medblocks.com` : 'patient@medblocks.com');
+          const dob = p.dob || p.birthDate || p.birth_date || '1987-03-22';
+          
+          // Calculate age dynamically from birthDate
+          const birthYear = new Date(dob).getFullYear();
+          const calculatedAge = isNaN(birthYear) ? 39 : 2026 - birthYear;
 
           return {
             id: p.id || p.patient_membership_id || `mb-${Math.random().toString(36).substring(2, 7)}`,
             name: fullName,
             email: email,
-            phone: p.phone || '(555) 234-5678',
-            dob: p.dob || p.birth_date || '1984-05-12',
-            age: p.age || 42,
+            phone: p.phone || '(555) 617-8822',
+            dob: dob,
+            age: p.age || calculatedAge,
             gender: p.gender ? p.gender.charAt(0).toUpperCase() + p.gender.slice(1) : 'Female',
             location: p.location || 'Boston, MA',
-            lastVisitDate: p.last_visit_date || 'July 30, 2026',
-            primaryDoctor: p.primary_doctor || 'Dr. Sarah Vance, MD',
-            emergencyContact: p.emergencyContact || { name: 'Emergency Contact', relationship: 'Spouse', phone: '(555) 234-9988' },
-            insurance: p.insurance || { provider: 'Blue Cross Blue Shield', policyId: 'BCBS-88392019', groupId: 'GRP-9021' },
+            lastVisitDate: p.last_visit_date || 'July 25, 2026',
+            primaryDoctor: p.primary_doctor || 'Dr. Marcus Thorne, MD',
+            emergencyContact: p.emergencyContact || { name: 'David Lin', relationship: 'Brother', phone: '(555) 617-9900' },
+            insurance: p.insurance || { provider: 'Tufts Health Plan', policyId: 'THP-883012', groupId: 'MA-33201' },
             whatChangedSummary: p.whatChangedSummary || 'FHIR R4 live record synchronized. Vitals and active prescriptions loaded.',
             doctorNotes: p.doctorNotes || {
-              date: 'July 30, 2026',
-              doctor: 'Dr. Sarah Vance, MD',
+              date: 'July 25, 2026',
+              doctor: 'Dr. Marcus Thorne, MD',
               summary: 'Live clinical session synchronized via Medblocks OAuth2 SMART-on-FHIR gateway.',
               keyInstructions: [
                 'Continue taking daily morning medication regimen.',
                 'Routine follow-up scheduled in 4 weeks.',
               ],
             },
-            nextVisit: p.nextVisit || { date: 'August 18, 2026', type: 'Routine Follow-Up', doctor: 'Dr. Sarah Vance, MD', location: 'Medblocks Primary Care', status: 'Confirmed' },
-            vitals: p.vitals || { bp: '118 / 78 mmHg', bpStatus: 'normal', heartRate: '72 bpm', hrStatus: 'normal', hba1c: '5.6 %', hba1cStatus: 'normal', spO2: '99 %', temp: '98.4 °F', height: `5' 7" (170 cm)`, weight: '142 lbs (64.4 kg)', bmi: '22.2 (Normal Weight)' },
-            allergies: p.allergies || [{ substance: 'Penicillin', severity: 'High', reaction: 'Hives & Facial Swelling' }],
-            labs: p.labs || [{ testName: 'Fasting Blood Glucose', value: '92 mg/dL', referenceRange: '70-99 mg/dL', status: 'Normal' }],
-            encounters: p.encounters || [{ date: 'July 30, 2026', type: 'Live FHIR Sync Encounter', doctor: 'Dr. Sarah Vance, MD', summary: 'Encounters fetched from Medblocks Sandbox.' }],
-            medications: p.medications || [{ name: 'Lisinopril 10 mg', instructions: 'Take 1 tablet daily by mouth', plainEnglish: 'Relaxes blood vessels to lower blood pressure.' }],
-            conditions: p.conditions || [{ name: 'Essential Hypertension', plainEnglish: 'High blood pressure requiring routine tracking.' }],
-            immunizations: p.immunizations || [{ name: 'COVID-19 mRNA Vaccine', plainEnglish: 'Protects against severe coronavirus symptoms.' }],
+            nextVisit: p.nextVisit || { date: 'August 18, 2026', type: 'Routine Follow-Up', doctor: 'Dr. Marcus Thorne, MD', location: 'Medblocks Primary Care', status: 'Confirmed' },
+            vitals: p.vitals || { bp: '116 / 76 mmHg', bpStatus: 'normal', heartRate: '68 bpm', hrStatus: 'normal', hba1c: '5.2 %', hba1cStatus: 'normal', spO2: '98 %', temp: '98.6 °F', height: `5' 6" (168 cm)`, weight: '135 lbs (61.2 kg)', bmi: '21.8 (Normal Weight)' },
+            allergies: p.allergies || [{ substance: 'Dust Mites', severity: 'Moderate', reaction: 'Nasal Congestion' }],
+            labs: p.labs || [{ testName: 'Peak Expiratory Flow', value: '450 L/min', referenceRange: '380 - 500 L/min', status: 'Normal' }],
+            encounters: p.encounters || [{ date: 'July 25, 2026', type: 'Live FHIR Sync Encounter', doctor: 'Dr. Marcus Thorne, MD', summary: 'Encounters fetched from Medblocks Sandbox.' }],
+            medications: p.medications || [{ name: 'Albuterol HFA 90 mcg Inhaler', instructions: 'Inhale 2 puffs as needed', plainEnglish: 'Quick-relief rescue inhaler.' }],
+            conditions: p.conditions || [{ name: 'Mild Bronchial Asthma', plainEnglish: 'Airway inflammation causing occasional shortness of breath.' }],
+            immunizations: p.immunizations || [{ name: 'Flu Shot (Quadrivalent)', plainEnglish: 'Annual influenza protection.' }],
           };
         });
 
@@ -65,12 +68,43 @@ export async function GET() {
       }
     }
 
-    throw new Error(`API call failed with status ${response.status}`);
+    throw new Error(`API call status ${response.status}`);
   } catch (error: any) {
     console.warn('Medblocks Live API Sync Fallback:', error.message);
 
-    // Fallback sandbox roster if network fails
     const sandboxPatients = [
+      {
+        id: 'e1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+        name: 'Maya Lin',
+        email: 'maya.lin@medblocks.com',
+        phone: '(555) 617-8822',
+        dob: '1987-03-22',
+        age: 39,
+        gender: 'Female',
+        location: 'Boston, MA',
+        lastVisitDate: 'July 25, 2026',
+        primaryDoctor: 'Dr. Marcus Thorne, MD (Pulmonology)',
+        emergencyContact: { name: 'David Lin', relationship: 'Brother', phone: '(555) 617-9900' },
+        insurance: { provider: 'Tufts Health Plan', policyId: 'THP-883012', groupId: 'MA-33201' },
+        whatChangedSummary: 'Imported FHIR R4 Bundle linked. SpO2 baseline normal at 98%. Albuterol rescue inhaler refilled.',
+        doctorNotes: {
+          date: 'July 25, 2026',
+          doctor: 'Dr. Marcus Thorne, MD',
+          summary: 'Routine pulmonary check. Asthma symptoms well-managed during summer months.',
+          keyInstructions: [
+            'Keep Albuterol inhaler accessible during outdoor exercise.',
+            'Log peak flow readings if seasonal allergy symptoms spike.'
+          ]
+        },
+        nextVisit: { date: 'October 14, 2026', type: 'Asthma Compliance & Pulmonary Check', doctor: 'Dr. Marcus Thorne, MD', location: 'Pulmonary Care Suite', status: 'Scheduled' },
+        vitals: { bp: '116 / 76 mmHg', bpStatus: 'normal', heartRate: '68 bpm', hrStatus: 'normal', hba1c: '5.2 %', hba1cStatus: 'normal', spO2: '98 %', temp: '98.6 °F', height: `5' 6" (168 cm)`, weight: '135 lbs (61.2 kg)', bmi: '21.8 (Normal Weight)' },
+        allergies: [{ substance: 'Dust Mites', severity: 'Moderate', reaction: 'Nasal Congestion & Mild Wheezing' }],
+        labs: [{ testName: 'Peak Expiratory Flow (PEF)', value: '450 L/min', referenceRange: '380 - 500 L/min', status: 'Normal' }],
+        encounters: [{ date: 'July 25, 2026', type: 'Pulmonary Consultation', doctor: 'Dr. Marcus Thorne, MD', summary: 'Asthma symptom evaluation.' }],
+        medications: [{ name: 'Albuterol HFA 90 mcg Inhaler', instructions: 'Inhale 2 puffs as needed', plainEnglish: 'Quick-relief rescue inhaler.' }],
+        conditions: [{ name: 'Mild Bronchial Asthma', plainEnglish: 'Airway inflammation causing occasional shortness of breath.' }],
+        immunizations: [{ name: 'Flu Shot (Quadrivalent)', plainEnglish: 'Annual influenza protection.' }],
+      },
       {
         id: 'f1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c',
         name: 'Marcus Sterling',
@@ -101,38 +135,6 @@ export async function GET() {
         encounters: [{ date: 'July 20, 2026', type: 'Endocrinology Consultation', doctor: 'Dr. Elena Rostova, MD', summary: 'Reviewed HbA1c results.' }],
         medications: [{ name: 'Metformin 500 mg', instructions: 'Take 1 tablet twice daily with meals', plainEnglish: 'Lowers blood sugar levels.' }],
         conditions: [{ name: 'Type 2 Diabetes Mellitus', plainEnglish: 'Condition where body has trouble regulating blood sugar.' }],
-        immunizations: [{ name: 'COVID-19 mRNA Vaccine', plainEnglish: 'Coronavirus protection.' }],
-      },
-      {
-        id: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
-        name: 'Elena Vance',
-        email: 'elena.vance@medblocks.com',
-        phone: '(555) 432-8899',
-        dob: '1981-04-14',
-        age: 45,
-        gender: 'Female',
-        location: 'Boston, MA',
-        lastVisitDate: 'July 30, 2026',
-        primaryDoctor: 'Dr. Sarah Vance, MD',
-        emergencyContact: { name: 'Marcus Vance', relationship: 'Spouse', phone: '(555) 432-9900' },
-        insurance: { provider: 'Blue Cross Blue Shield', policyId: 'BCBS-991208', groupId: 'MA-77401' },
-        whatChangedSummary: 'Imported FHIR R4 Bundle linked via Medblocks API. Blood pressure stable at 118/78 mmHg.',
-        doctorNotes: {
-          date: 'July 30, 2026',
-          doctor: 'Dr. Sarah Vance, MD',
-          summary: 'Patient records imported successfully. Lisinopril regimen maintained.',
-          keyInstructions: [
-            'Continue taking Lisinopril 10mg daily in the morning.',
-            'Maintain daily walking routine.'
-          ]
-        },
-        nextVisit: { date: 'August 24, 2026', type: 'Routine Follow-Up', doctor: 'Dr. Sarah Vance, MD', location: 'Medblocks Primary Care', status: 'Confirmed' },
-        vitals: { bp: '118 / 78 mmHg', bpStatus: 'normal', heartRate: '72 bpm', hrStatus: 'normal', hba1c: '5.6 %', hba1cStatus: 'normal', spO2: '99 %', temp: '98.4 °F', height: `5' 7" (170 cm)`, weight: '142 lbs (64.4 kg)', bmi: '22.2 (Normal Weight)' },
-        allergies: [{ substance: 'Penicillin', severity: 'High', reaction: 'Hives & Respiratory Swelling' }],
-        labs: [{ testName: 'Fasting Blood Glucose', value: '92 mg/dL', referenceRange: '70 - 99 mg/dL', status: 'Normal' }],
-        encounters: [{ date: 'July 30, 2026', type: 'Imported FHIR Data Sync', doctor: 'Dr. Sarah Vance, MD', summary: 'Patient record imported from Medblocks.' }],
-        medications: [{ name: 'Lisinopril 10 mg', instructions: 'Take 1 tablet daily by mouth in the morning', plainEnglish: 'Relaxes blood vessels.' }],
-        conditions: [{ name: 'Essential Hypertension', plainEnglish: 'High blood pressure requiring daily routine tracking.' }],
         immunizations: [{ name: 'COVID-19 mRNA Vaccine', plainEnglish: 'Coronavirus protection.' }],
       },
       {
