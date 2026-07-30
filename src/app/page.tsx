@@ -190,10 +190,7 @@ function generateRolling28Days(): CalendarDayLog[] {
       caffeineIntake: '1-2 Cups ☕',
       activityLevel: 'Moderate',
       notes: '',
-      medsTaken: {
-        'Lisinopril 10 mg': true,
-        'Metformin 500 mg': true,
-      },
+      medsTaken: {},
       workouts: i % 3 === 0 ? [
         { exercise: '1 Mile Run', details: 'Completed 1 mile run' },
         { exercise: 'Deadlift', details: '3 sets x 8 reps @ 275 lbs' },
@@ -338,7 +335,7 @@ export default function Dashboard() {
     onAfterPrint: () => setShowEmergencyModal(false),
     pageStyle: `
       @page { size: portrait; margin: 0; }
-      body { margin: 0 !important; padding: 24px !important; background: white !important; display: flex !important; justify-content: center !important; align-items: flex-start !important; }
+      body { margin: 0 !important; padding: 24px !important; background: white !important; display: flex !important; justify-center: center !important; align-items: flex-start !important; }
       html, body { height: 100% !important; overflow: hidden !important; }
     `,
   });
@@ -527,10 +524,12 @@ export default function Dashboard() {
     window.print();
   };
 
+  // --- Patient-Filtered Medication Adherence Calculation ---
   const activeDayMeds = activeDayLog.medsTaken || {};
-  const totalMedsCount = patient?.medications?.length || 0;
-  const takenMedsCount = Object.values(activeDayMeds).filter(Boolean).length;
-  const adherencePercent = totalMedsCount > 0 ? Math.round((takenMedsCount / totalMedsCount) * 100) : 100;
+  const patientMedNames = patient?.medications?.map((m) => m.name) || [];
+  const totalMedsCount = patientMedNames.length;
+  const takenMedsCount = patientMedNames.filter((medName) => activeDayMeds[medName]).length;
+  const adherencePercent = totalMedsCount > 0 ? Math.min(100, Math.round((takenMedsCount / totalMedsCount) * 100)) : 0;
 
   return (
     <div className="min-h-screen bg-slate-100/80 text-slate-900 font-sans print:bg-white print:p-0 flex flex-col justify-between relative overflow-x-hidden">
@@ -2219,19 +2218,22 @@ export default function Dashboard() {
             <div className="space-y-3 text-xs">
               <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
                 <span className="font-extrabold text-indigo-950 block">💊 Medications Logged:</span>
-                {dayModalLog.medsTaken && Object.keys(dayModalLog.medsTaken).length > 0 ? (
+                {patient?.medications && patient.medications.length > 0 ? (
                   <div className="space-y-1 pt-1">
-                    {Object.entries(dayModalLog.medsTaken).map(([med, taken], i) => (
-                      <div key={i} className="flex justify-between items-center text-slate-800 font-medium">
-                        <span>• {med}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${taken ? 'bg-emerald-200 text-emerald-950' : 'bg-slate-200 text-slate-600'}`}>
-                          {taken ? '✅ Taken' : '❌ Missed'}
-                        </span>
-                      </div>
-                    ))}
+                    {patient.medications.map((med, i) => {
+                      const isTaken = !!dayModalLog.medsTaken?.[med.name];
+                      return (
+                        <div key={i} className="flex justify-between items-center text-slate-800 font-medium">
+                          <span>• {med.name}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isTaken ? 'bg-emerald-200 text-emerald-950' : 'bg-slate-200 text-slate-600'}`}>
+                            {isTaken ? '✅ Taken' : 'Pending'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <span className="text-slate-500 italic block">No medication doses recorded.</span>
+                  <span className="text-slate-500 italic block">No active prescriptions linked to patient record.</span>
                 )}
               </div>
 
