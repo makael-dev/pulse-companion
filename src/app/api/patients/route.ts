@@ -37,10 +37,8 @@ export async function GET() {
           const fullName = p.name || `${p.first_name || p.given_name || ''} ${p.last_name || p.family_name || ''}`.trim() || 'Connected Patient';
           const email = p.email || `${fullName.toLowerCase().replace(/\s+/g, '.')}@medblocks.com`;
           
-          // Deterministic hash helper for consistent dynamic per-patient values
           const hash = fullName.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
 
-          // DYNAMIC UNIQUE DOB & AGE CALCULATION
           const rawDob = p.birthDate || p.birth_date || p.dob || p.dateOfBirth;
           let dob = rawDob;
           if (!dob) {
@@ -53,7 +51,6 @@ export async function GET() {
           const birthYear = new Date(dob).getFullYear();
           const calculatedAge = !isNaN(birthYear) ? 2026 - birthYear : 40;
 
-          // DYNAMIC GENDER PARSING
           let rawGender = p.gender || p.sex || '';
           if (!rawGender) {
             const lower = fullName.toLowerCase();
@@ -65,11 +62,9 @@ export async function GET() {
           }
           const formattedGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
 
-          // DYNAMIC PHONE & LOCATION
           const phone = p.phone || p.telecom?.[0]?.value || `(555) ${Math.floor(100 + (hash % 800))}-${Math.floor(1000 + (hash * 3 % 8999))}`;
           const location = p.location || (p.address?.[0]?.city ? `${p.address[0].city}, ${p.address[0].state || 'MA'}` : 'Boston, MA');
 
-          // DYNAMIC DOCTOR & VISIT DATES
           const doctorName = p.primary_doctor || p.primaryDoctor || DOCTOR_ROSTER[hash % DOCTOR_ROSTER.length];
           const visitType = VISIT_TYPES[hash % VISIT_TYPES.length];
 
@@ -77,6 +72,12 @@ export async function GET() {
           const nextVisitDay = (hash % 25) + 1;
           const lastVisitDate = p.last_visit_date || `July ${lastVisitDay}, 2026`;
           const nextVisitDate = p.nextVisit?.date || `August ${nextVisitDay}, 2026`;
+
+          // Clean height math calculation (no 5'12")
+          const totalInches = 62 + (hash % 14);
+          const feet = Math.floor(totalInches / 12);
+          const inches = totalInches % 12;
+          const formattedHeight = `${feet}' ${inches}"`;
 
           return {
             id: p.id || p.patient_membership_id || `mb-${Math.random().toString(36).substring(2, 7)}`,
@@ -125,7 +126,7 @@ export async function GET() {
               hba1cStatus: (hash % 4 === 0) ? 'warning' : 'normal', 
               spO2: '98 %', 
               temp: '98.6 °F', 
-              height: `5' ${8 + (hash % 5)}"`, 
+              height: formattedHeight, 
               weight: `${150 + (hash % 35)} lbs`, 
               bmi: `${(21.0 + (hash % 60) / 10).toFixed(1)}` 
             },
