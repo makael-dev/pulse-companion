@@ -11,6 +11,7 @@ import VitalsChart from './components/VitalsChart';
 import LabGaugeModal from './components/LabGaugeModal';
 import AppointmentPrepTimeline from './components/AppointmentPrepTimeline';
 import WorkoutTracker from './components/WorkoutTracker';
+import RPGStatsCard from './components/RPGStatsCard';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
@@ -194,8 +195,8 @@ function generateRolling28Days(): CalendarDayLog[] {
         'Metformin 500 mg': i !== 2,
       },
       workouts: i % 3 === 0 ? [
+        { exercise: '1 Mile Run', details: 'Completed 1 mile run' },
         { exercise: 'Deadlift', details: '3 sets x 8 reps @ 275 lbs' },
-        { exercise: '1 Mile Run', details: 'Completed in 7:45' },
       ] : [],
     });
   }
@@ -228,6 +229,7 @@ export default function Dashboard() {
     shareLabs: true,
     shareMentalHealth: true,
     shareFitness: true,
+    shareRPGStats: true, // 👈 Controlled RPG Video Game Character Stats visibility
     shareTrials: true,
     shareEncounters: true,
   });
@@ -245,6 +247,7 @@ export default function Dashboard() {
       shareLabs: showAll,
       shareMentalHealth: showAll,
       shareFitness: showAll,
+      shareRPGStats: showAll,
       shareTrials: showAll,
       shareEncounters: showAll,
     });
@@ -601,6 +604,19 @@ export default function Dashboard() {
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
+                    <span className="font-bold text-slate-900 block">🎮 RPG Video Game Fitness Stats Sheet</span>
+                    <span className="text-[10px] text-slate-500">Show gamified Character Stats (STR, END, VIT, REC)</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={consentPermissions.shareRPGStats}
+                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareRPGStats: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
+                  <div>
                     <span className="font-bold text-slate-900 block">🗓️ Appointment Prep Checklist</span>
                     <span className="text-[10px] text-slate-500">Show upcoming appointment countdown checklist</span>
                   </div>
@@ -757,8 +773,8 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">🏃‍♂️ Apple Health Activity & Fitness Telemetry</span>
-                    <span className="text-[10px] text-slate-500">Show step counts, exercise, and personal records</span>
+                    <span className="font-bold text-slate-900 block">🏃‍♂️ Apple Health Activity Telemetry</span>
+                    <span className="text-[10px] text-slate-500">Show step counts and exercise telemetry</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1809,11 +1825,20 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH WORKOUT TRACKER */}
+        {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH RPG VIDEO GAME STATS CARD & WORKOUT TRACKER */}
         {activeTab === 'fitness' && (
           <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
             {consentPermissions.shareFitness ? (
               <div className="space-y-4">
+                {/* 🎮 RPG Video Game Character Stats Sheet (Controlled by Privacy Controls) */}
+                {consentPermissions.shareRPGStats ? (
+                  <RPGStatsCard patient={patient} calendarLogs={calendarLogs} />
+                ) : (
+                  <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-center text-xs text-slate-400 italic">
+                    🔒 RPG Video Game Fitness Stats Sheet redacted by patient consent.
+                  </div>
+                )}
+
                 {/* 🏋️ Personal Workout Tracker & Demographic Benchmarks */}
                 <WorkoutTracker patient={patient} />
 
