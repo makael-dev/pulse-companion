@@ -29,15 +29,15 @@ function resolveTargetDate(text: string, defaultLabel: string): string {
   return defaultLabel;
 }
 
-// Symptom Statement Detector
-function isSymptomStatement(text: string): boolean {
+// Symptom / Activity Statement Detector
+function isActivityOrNoteStatement(text: string): boolean {
   const lower = text.toLowerCase();
-  const symptomKeywords = [
+  const keywords = [
     'hurt', 'hurts', 'hurting', 'pain', 'sore', 'ache', 'aches', 'aching',
     'dizzy', 'dizziness', 'headache', 'tightness', 'cramps', 'cramping',
     'swollen', 'swelling', 'nausea', 'fatigue', 'tired', 'cough', 'fever', 'sick', 'unwell', 'ill'
   ];
-  return symptomKeywords.some((word) => lower.includes(word));
+  return keywords.some((word) => lower.includes(word));
 }
 
 // Tool Definitions for OpenAI Function Calling
@@ -105,8 +105,24 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'log_workout',
+      description: 'Log a workout, exercise, run, or rep count to the patient workout log.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          exercise: { type: 'STRING', description: 'Short exercise title, e.g. 1 Mile Run or Bench Press' },
+          details: { type: 'STRING', description: 'Exercise details like 3 miles in 24 mins or 3 sets x 8 reps' },
+          targetDateStr: { type: 'STRING', description: 'Target date string.' }
+        },
+        required: ['exercise', 'details']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'log_context_note',
-      description: 'Log a symptom, note, or health observation to the patient calendar.',
+      description: 'Log a symptom, note, or general health observation to the patient calendar.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -137,11 +153,46 @@ export async function POST(req: Request) {
     if (EMERGENCY_PATTERNS.some((p) => p.test(cleanMessage))) {
       return NextResponse.json({
         reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911) or visit the nearest Emergency Room immediately.",
-        chips: ['Emergency ID', 'Call Doctor', 'View Vitals']
+        chips: ['Emergency ID', 'View Vitals']
       });
     }
 
-    // --- 🩺 GENERAL ILLNESS / "WHAT DO I DO IF I AM SICK" HANDLER ---
+    // --- 🏋️ WORKOUT & EXERCISE TRACKING HANDLER ---
+    if (
+      lower.includes('track') ||
+      lower.includes('log') ||
+      lower.includes('ran') ||
+      lower.includes('run') ||
+      lower.includes('deadlift') ||
+      lower.includes('bench') ||
+      lower.includes('workout') ||
+      lower.includes('reps') ||
+      lower.includes('mile')
+    ) {
+      let exerciseName = 'Workout Session';
+      if (lower.includes('run') || lower.includes('ran') || lower.includes('mile')) {
+        exerciseName = 'Running / Cardio';
+      } else if (lower.includes('deadlift')) {
+        exerciseName = 'Deadlift';
+      } else if (lower.includes('bench')) {
+        exerciseName = 'Bench Press';
+      } else if (lower.includes('squat')) {
+        exerciseName = 'Squat';
+      }
+
+      return NextResponse.json({
+        reply: `🏃‍♂️ **Logged Workout for ${targetDate}:** "${cleanMessage}". Added directly to your Workout & Reps Log!`,
+        action: { 
+          type: 'LOG_WORKOUT', 
+          exercise: exerciseName,
+          details: cleanMessage,
+          targetDateStr: targetDate 
+        },
+        chips: ['View Calendar', 'Log Meds Taken', 'Check Vitals']
+      });
+    }
+
+    // --- 🩺 GENERAL ILLNESS HANDLER ---
     if (
       lower.includes('if i am sick') ||
       lower.includes('if i get sick') ||
@@ -258,6 +309,16 @@ Be conversational, warm, and helpful. Use functions when appropriate.`;
               break;
             }
 
+            case 'log_workout': {
+              const date = args.targetDateStr || targetDate;
+              const ex = args.exercise || 'Workout Session';
+              const dt = args.details || cleanMessage;
+              reply = `🏃‍♂️ Added workout to **${date}**: "${ex} (${dt})". Updated in your Workout & Reps Log!`;
+              action = { type: 'LOG_WORKOUT', exercise: ex, details: dt, targetDateStr: date };
+              chips = ['View Calendar', 'Log Meds Taken', 'Check Vitals'];
+              break;
+            }
+
             case 'log_context_note': {
               const date = args.targetDateStr || targetDate;
               const note = args.noteText || cleanMessage;
@@ -319,7 +380,7 @@ Be conversational, warm, and helpful. Use functions when appropriate.`;
       });
     }
 
-    if (isSymptomStatement(cleanMessage)) {
+    if (isActivityOrNoteStatement(cleanMessage)) {
       return NextResponse.json({
         reply: `📝 Added note for **${targetDate}**: "${cleanMessage}". Your daily calendar log has been updated!`,
         action: { type: 'LOG_NOTE', noteText: cleanMessage, targetDateStr: targetDate },

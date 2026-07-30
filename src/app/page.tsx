@@ -375,6 +375,26 @@ export default function Dashboard() {
     setCalendarLogs(updated);
   };
 
+  const handleLogWorkoutToCalendar = (exercise: string, details: string, targetDateStr?: string) => {
+    const updated = [...calendarLogs];
+    let targetIndex = selectedDateIndex;
+
+    if (targetDateStr) {
+      const foundIdx = updated.findIndex((log) => log.dateStr.toLowerCase() === targetDateStr.toLowerCase());
+      if (foundIdx !== -1) {
+        targetIndex = foundIdx;
+        setSelectedDateIndex(foundIdx);
+      }
+    }
+
+    const existingWorkouts = updated[targetIndex].workouts || [];
+    updated[targetIndex].workouts = [
+      ...existingWorkouts,
+      { exercise, details }
+    ];
+    setCalendarLogs(updated);
+  };
+
   const [generatedQuestions, setGeneratedQuestions] = useState<string | null>(null);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -516,7 +536,7 @@ export default function Dashboard() {
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              {caregiverMode ? '👨‍gsub Caregiver View Active' : '👤 Patient View'}
+              {caregiverMode ? '👨‍👩‍👧 Caregiver View Active' : '👤 Patient View'}
             </button>
 
             <button
@@ -1895,6 +1915,7 @@ export default function Dashboard() {
         calendarLogs={calendarLogs}
         selectedDateLabel={activeDayLog.dateStr}
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
+        onLogWorkoutToCalendar={(exercise, details, targetDateStr) => handleLogWorkoutToCalendar(exercise, details, targetDateStr)}
         onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
       />
 

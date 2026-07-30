@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, X, Bot } from 'lucide-react';
+import { Send, Sparkles, X, Bot, Move } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -16,6 +16,7 @@ interface PulseChatDrawerProps {
   calendarLogs: any[];
   selectedDateLabel: string;
   onLogToCalendar: (noteText: string, targetDateStr?: string) => void;
+  onLogWorkoutToCalendar: (exercise: string, details: string, targetDateStr?: string) => void;
   onLogMedsForDate: (targetDateStr: string) => void;
 }
 
@@ -24,16 +25,58 @@ export default function PulseChatDrawer({
   calendarLogs,
   selectedDateLabel,
   onLogToCalendar,
+  onLogWorkoutToCalendar,
   onLogMedsForDate,
 }: PulseChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // --- DRAGGABLE POSITION STATE ---
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number }>({
+    startX: 0, startY: 0, initialX: 0, initialY: 0
+  });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: position.x,
+      initialY: position.y,
+    };
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPosition({
+        x: dragRef.current.initialX + dx,
+        y: dragRef.current.initialY + dy,
+      });
+    };
+
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'msg-init',
       sender: 'assistant',
-      text: "I'm here to help organize your health records! Ask me about your medications, what lab tests mean, missed doses, doctor visits, or log notes.",
+      text: "I'm here to help organize your health records! Ask me about your medications, doctor visits, workouts, or log notes.",
       chips: ['What are my vitals?', 'When is my next visit?', 'List my medications'],
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -45,7 +88,6 @@ export default function PulseChatDrawer({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
-  // Handle sending messages (Supports typing OR clicking a suggestion chip)
   const handleSendMessage = async (overrideText?: string) => {
     const textToSend = overrideText || inputText;
     if (!textToSend.trim() || isLoading) return;
@@ -86,54 +128,49 @@ export default function PulseChatDrawer({
 
         setMessages((prev) => [...prev, assistantMsg]);
 
-        // Action Handlers for Tool Calling
         if (data.action?.type === 'LOG_MEDS_TAKEN') {
           onLogMedsForDate(data.action.targetDateStr || selectedDateLabel);
+        } else if (data.action?.type === 'LOG_WORKOUT') {
+          onLogWorkoutToCalendar(
+            data.action.exercise || 'Workout Session',
+            data.action.details || textToSend,
+            data.action.targetDateStr
+          );
         } else if (data.action?.type === 'LOG_NOTE') {
           onLogToCalendar(data.action.noteText || textToSend, data.action.targetDateStr);
         }
-      } else {
-        throw new Error('Chat API returned error');
       }
     } catch (err) {
-      console.error('Chat Drawer Error:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          sender: 'assistant',
-          text: "I am available to assist with your records. Ask me about your medications, doctor visits, or log notes!",
-          chips: ['My Vitals', 'Next Appointment', 'My Medications'],
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-full max-w-xs sm:max-w-sm print:hidden">
+    <div 
+      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      className="fixed bottom-4 right-4 z-50 w-full max-w-xs sm:max-w-sm print:hidden transition-transform duration-75"
+    >
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden backdrop-blur flex flex-col max-h-[520px]">
-        {/* Drawer Header */}
+        {/* DRAGGABLE HEADER */}
         <div 
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between cursor-pointer select-none"
+          onMouseDown={handleMouseDown}
+          className="p-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between cursor-grab active:cursor-grabbing select-none"
         >
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
+            <Move className="w-3.5 h-3.5 text-slate-500" />
+            <div className="p-1 rounded bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
-                Pulse Companion AI
-              </h3>
+              <h3 className="text-xs font-bold text-white tracking-wide">Pulse Companion AI</h3>
               <p className="text-[10px] text-slate-400">Target Date: {selectedDateLabel}</p>
             </div>
           </div>
           <button 
             type="button" 
-            onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+            onClick={() => setIsOpen(!isOpen)}
             className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
           >
             <X className="w-4 h-4" />
@@ -142,7 +179,6 @@ export default function PulseChatDrawer({
 
         {isOpen && (
           <>
-            {/* Messages Scroll View */}
             <div className="p-3 overflow-y-auto space-y-3 flex-1 min-h-[260px] max-h-[340px] bg-slate-900/90">
               {messages.map((msg) => (
                 <div key={msg.id} className="space-y-1.5">
@@ -156,7 +192,6 @@ export default function PulseChatDrawer({
                     {msg.text}
                   </div>
 
-                  {/* 💡 Suggestion Chips (Polished Legibility & Contrast) */}
                   {msg.sender === 'assistant' && msg.chips && msg.chips.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {msg.chips.map((chipText, i) => (
@@ -182,7 +217,6 @@ export default function PulseChatDrawer({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Custom Text Entry Bar */}
             <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center gap-2">
               <input
                 type="text"
@@ -203,7 +237,6 @@ export default function PulseChatDrawer({
               </button>
             </div>
 
-            {/* Softened Disclaimer Banner */}
             <div className="bg-amber-950/30 border-t border-amber-800/30 px-3 py-1.5 text-[10px] text-amber-300/70 font-medium">
               ⚠️ <strong>Notice:</strong> For preparation only. Not a substitute for professional clinical advice.
             </div>
