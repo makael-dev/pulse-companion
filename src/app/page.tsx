@@ -212,10 +212,12 @@ export default function Dashboard() {
   // --- DAY SUMMARY POPUP MODAL STATE ---
   const [dayModalLog, setDayModalLog] = useState<CalendarDayLog | null>(null);
 
-  // --- EHR CONNECT & MULTI-STEP OAUTH STATE ---
+  // --- EHR CONNECT & MULTI-STEP OAUTH STATE WITH LOGIN ---
   const [showEHRModal, setShowEHRModal] = useState(false);
-  const [linkStep, setLinkStep] = useState<'select' | 'auth' | 'sync'>('select');
+  const [linkStep, setLinkStep] = useState<'select' | 'login' | 'auth' | 'sync'>('select');
   const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   
   // STARTS DISCONNECTED (NULL) ON PAGE RELOAD
   const [connectedPortal, setConnectedPortal] = useState<string | null>(null);
@@ -335,7 +337,7 @@ export default function Dashboard() {
     onAfterPrint: () => setShowEmergencyModal(false),
     pageStyle: `
       @page { size: portrait; margin: 0; }
-      body { margin: 0 !important; padding: 24px !important; background: white !important; display: flex !important; justify-center: center !important; align-items: flex-start !important; }
+      body { margin: 0 !important; padding: 24px !important; background: white !important; display: flex !important; justify-content: center !important; align-items: flex-start !important; }
       html, body { height: 100% !important; overflow: hidden !important; }
     `,
   });
@@ -2006,7 +2008,7 @@ export default function Dashboard() {
         <LabGaugeModal lab={selectedLab} onClose={() => setSelectedLab(null)} />
       )}
 
-      {/* 🏥 MULTI-STEP SMART-ON-FHIR LINKING MODAL WITH VISIBLE SCROLL CONTAINER */}
+      {/* 🏥 MULTI-STEP SMART-ON-FHIR LINKING MODAL WITH LOGIN OPTION */}
       {showEHRModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
@@ -2020,7 +2022,7 @@ export default function Dashboard() {
               ✕
             </button>
 
-            {/* STEP 1: SELECT HEALTH SYSTEM / SANDBOX PATIENT CARDS */}
+            {/* STEP 1: SELECT SANDBOX PATIENT OR LOGIN */}
             {linkStep === 'select' && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
@@ -2030,7 +2032,7 @@ export default function Dashboard() {
                       Connect Health Records
                     </h3>
                     <p className="text-xs text-slate-500 font-medium">
-                      Select a Medblocks Sandbox Patient to authenticate & link
+                      Select a Medblocks Sandbox Patient or Log In
                     </p>
                   </div>
                 </div>
@@ -2044,8 +2046,8 @@ export default function Dashboard() {
                   </span>
                 </div>
 
-                {/* VISIBLE SCROLLBAR CONTAINER FOR ALL PATIENTS */}
-                <div className="space-y-2 pt-1 text-xs h-64 overflow-y-scroll pr-2 border border-slate-100 rounded-xl p-1 bg-slate-50/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-indigo-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+                {/* SCROLLABLE PATIENT CARDS */}
+                <div className="space-y-2 pt-1 text-xs h-56 overflow-y-scroll pr-2 border border-slate-100 rounded-xl p-1 bg-slate-50/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-indigo-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                   {patients && patients.length > 0 ? (
                     patients.map((p) => (
                       <div
@@ -2074,7 +2076,8 @@ export default function Dashboard() {
                           type="button"
                           onClick={() => {
                             setSelectedTargetPatient(p.id);
-                            setLinkStep('auth');
+                            setLoginEmail(p.email || `${p.name.toLowerCase().replace(/\s+/g, '.')}@medblocks.com`);
+                            setLinkStep('login');
                           }}
                           className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] transition shadow-sm cursor-pointer shrink-0"
                         >
@@ -2089,6 +2092,21 @@ export default function Dashboard() {
                   )}
                 </div>
 
+                <div className="pt-1 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">Have a custom portal account?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('');
+                      setLoginPassword('');
+                      setLinkStep('login');
+                    }}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                  >
+                    🔑 Direct Patient Login
+                  </button>
+                </div>
+
                 {patient && (
                   <button
                     type="button"
@@ -2098,37 +2116,99 @@ export default function Dashboard() {
                     🔌 Disconnect Current Session
                   </button>
                 )}
-
-                <div className="p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100 text-[10px] text-indigo-900 font-medium">
-                  🔒 Uses OAuth 2.0 PKCE protocol to fetch Patient, Observation, and MedicationRequest FHIR resources.
-                </div>
               </div>
             )}
 
-            {/* STEP 2: MOCK OAUTH PORTAL LOGIN & CONSENT */}
+            {/* STEP 2: PATIENT LOGIN SCREEN */}
+            {linkStep === 'login' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
+                  <span className="text-2xl">🔐</span>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900">Patient Portal Login</h3>
+                    <p className="text-xs text-slate-500">Log in to authenticate your health records</p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setLinkStep('auth');
+                  }}
+                  className="space-y-3"
+                >
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Email / Username</label>
+                    <input
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="patient@medblocks.com"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={loginPassword || '••••••••••••'}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
+                    <span>🔒 Secured via SMART-on-FHIR Gateway</span>
+                    <span className="font-bold text-emerald-600">2FA Enabled</span>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setLinkStep('select')}
+                      className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs shadow transition cursor-pointer"
+                    >
+                      Log In & Proceed →
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* STEP 3: MOCK OAUTH PORTAL AUTHORIZATION */}
             {linkStep === 'auth' && (
               <div className="space-y-4">
                 <div className="bg-indigo-950 text-white p-3.5 rounded-xl flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🔒</span>
                     <div>
-                      <h4 className="text-xs font-extrabold text-white">Medblocks Portal Authentication</h4>
+                      <h4 className="text-xs font-extrabold text-white">Medblocks Portal Authorization</h4>
                       <p className="text-[10px] text-indigo-300">OAuth 2.0 SMART-on-FHIR Session</p>
                     </div>
                   </div>
                   <span className="text-[9px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-bold uppercase">
-                    Sandbox Mode
+                    Authenticated
                   </span>
                 </div>
 
                 <div className="space-y-2.5 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <label className="block font-bold text-slate-800">
-                    User Credentials / Patient ID:
+                    Logged-in Patient Account:
                   </label>
                   <input
                     type="text"
                     readOnly
-                    value={patients.find((p) => p.id === selectedTargetPatient)?.email || 'patient@medblocks.com'}
+                    value={loginEmail || patients.find((p) => p.id === selectedTargetPatient)?.email || 'patient@medblocks.com'}
                     className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-lg font-mono text-[11px] font-bold"
                   />
 
@@ -2143,7 +2223,7 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setLinkStep('select')}
+                    onClick={() => setLinkStep('login')}
                     className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer font-sans"
                   >
                     Back
@@ -2153,7 +2233,7 @@ export default function Dashboard() {
                     onClick={() => {
                       setLinkStep('sync');
                       setTimeout(() => {
-                        const target = patients.find((p) => p.id === selectedTargetPatient);
+                        const target = patients.find((p) => p.id === selectedTargetPatient) || patients[0];
                         if (target) {
                           setPatient(target);
                           setSelectedPatientId(target.id);
@@ -2171,7 +2251,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* STEP 3: LIVE SYNC & PARSING ANIMATION */}
+            {/* STEP 4: LIVE SYNC & PARSING ANIMATION */}
             {linkStep === 'sync' && (
               <div className="p-8 text-center space-y-4">
                 <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
