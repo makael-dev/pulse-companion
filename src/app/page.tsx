@@ -212,6 +212,15 @@ export default function Dashboard() {
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateRolling28Days());
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(27);
 
+  // --- MASTER GAMIFICATION SYSTEM TOGGLE ---
+  const [enableRPGSystem, setEnableRPGSystem] = useState<boolean>(true);
+
+  // --- DYNAMIC FITNESS PR STATES ---
+  const [deadliftPR, setDeadliftPR] = useState<number>(300);
+  const [benchPressPR, setBenchPressPR] = useState<number>(315);
+  const [mileRunPR, setMileRunPR] = useState<string>('7:45');
+  const [fiveKRunPR, setFiveKRunPR] = useState<string>('26:40');
+
   // --- LAB GAUGE MODAL STATE ---
   const [selectedLab, setSelectedLab] = useState<LabItem | null>(null);
 
@@ -229,12 +238,13 @@ export default function Dashboard() {
     shareLabs: true,
     shareMentalHealth: true,
     shareFitness: true,
-    shareRPGStats: true, // 👈 Controlled RPG Video Game Character Stats visibility
+    shareRPGStats: true,
     shareTrials: true,
     shareEncounters: true,
   });
 
   const toggleAllPrivacyPermissions = (showAll: boolean) => {
+    setEnableRPGSystem(showAll);
     setConsentPermissions({
       shareVitals: showAll,
       shareDelta: showAll,
@@ -572,13 +582,40 @@ export default function Dashboard() {
                   <span className="text-2xl">🔒</span>
                   <div>
                     <h2 className="text-base font-extrabold text-slate-900">
-                      Privacy & Visibility Controls
+                      Privacy & System Controls
                     </h2>
                     <p className="text-[11px] text-slate-500 font-medium">
-                      Toggle component visibility across your dashboard.
+                      Toggle component visibility & system features.
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* MASTER RPG GAMIFICATION SYSTEM TOGGLE */}
+              <div className="flex items-center justify-between p-3.5 bg-indigo-950 text-white rounded-xl border-2 border-indigo-500/50 shadow-md">
+                <div>
+                  <span className="font-extrabold text-xs block text-amber-300">
+                    🎮 RPG Fitness & Job System (Master Switch)
+                  </span>
+                  <span className="text-[10px] text-indigo-200 block">
+                    {enableRPGSystem 
+                      ? 'Active: Gamified levels, job perks, & character AI active' 
+                      : 'Disabled: Gamification disabled across app & AI'}
+                  </span>
+                </div>
+                <label htmlFor="rpg-master-toggle" className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    id="rpg-master-toggle"
+                    type="checkbox"
+                    checked={enableRPGSystem}
+                    onChange={(e) => {
+                      setEnableRPGSystem(e.target.checked);
+                      setConsentPermissions({ ...consentPermissions, shareRPGStats: e.target.checked });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
+                </label>
               </div>
 
               <div className="flex items-center justify-between bg-slate-100 p-2 rounded-xl border border-slate-200">
@@ -602,19 +639,6 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
-                  <div>
-                    <span className="font-bold text-slate-900 block">🎮 RPG Video Game Fitness Stats Sheet</span>
-                    <span className="text-[10px] text-slate-500">Show gamified Character Stats (STR, END, VIT, REC)</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={consentPermissions.shareRPGStats}
-                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareRPGStats: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                  />
-                </div>
-
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
                     <span className="font-bold text-slate-900 block">🗓️ Appointment Prep Checklist</span>
@@ -728,45 +752,6 @@ export default function Dashboard() {
                     type="checkbox"
                     checked={consentPermissions.shareLabs}
                     onChange={(e) => setConsentPermissions({ ...consentPermissions, shareLabs: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
-                  <div>
-                    <span className="font-bold text-slate-900 block">🔬 Clinical Trial & Support Matcher</span>
-                    <span className="text-[10px] text-slate-500">Show local trial and community group recommendations</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={consentPermissions.shareTrials}
-                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareTrials: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
-                  <div>
-                    <span className="font-bold text-slate-900 block">📜 Clinical Encounter History</span>
-                    <span className="text-[10px] text-slate-500">Show doctor visit history logs</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={consentPermissions.shareEncounters}
-                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareEncounters: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
-                  <div>
-                    <span className="font-bold text-slate-900 block">🌙 Sleep & Mental Health Grid</span>
-                    <span className="text-[10px] text-slate-500">Show 28-day mood and stress tracking</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={consentPermissions.shareMentalHealth}
-                    onChange={(e) => setConsentPermissions({ ...consentPermissions, shareMentalHealth: e.target.checked })}
                     className="w-4 h-4 accent-indigo-600 cursor-pointer"
                   />
                 </div>
@@ -1386,7 +1371,7 @@ export default function Dashboard() {
         {/* TAB 2: SYMPTOM LOG, COUNTDOWN TIMELINE & DOCTOR PREP */}
         {activeTab === 'symptoms' && (
           <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
-            {/* 🗓️ Appointment Prep Countdown Checklist (Controlled by Privacy Settings) */}
+            {/* 🗓️ Appointment Prep Countdown Checklist */}
             {consentPermissions.sharePrepTimeline ? (
               <AppointmentPrepTimeline targetDate={patient?.nextVisit?.date || 'August 18, 2026'} />
             ) : (
@@ -1556,7 +1541,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 3: UNIFIED ROLLING 28-DAY CALENDAR (SLEEP, MEDS, WORKOUTS & REPS) */}
+        {/* TAB 3: UNIFIED ROLLING 28-DAY CALENDAR */}
         {activeTab === 'wellness' && (
           <section aria-label="Sleep & Daily Calendar Tracking" className="space-y-4">
             {consentPermissions.shareMentalHealth ? (
@@ -1825,22 +1810,35 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH RPG VIDEO GAME STATS CARD & WORKOUT TRACKER */}
+        {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH MASTER RPG TOGGLE CONTROL */}
         {activeTab === 'fitness' && (
           <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
             {consentPermissions.shareFitness ? (
               <div className="space-y-4">
-                {/* 🎮 RPG Video Game Character Stats Sheet (Controlled by Privacy Controls) */}
-                {consentPermissions.shareRPGStats ? (
-                  <RPGStatsCard patient={patient} calendarLogs={calendarLogs} />
-                ) : (
-                  <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-center text-xs text-slate-400 italic">
-                    🔒 RPG Video Game Fitness Stats Sheet redacted by patient consent.
-                  </div>
+                {/* 🎮 RPG Video Game Character Stats Sheet (Hides completely when disabled) */}
+                {enableRPGSystem && consentPermissions.shareRPGStats && (
+                  <RPGStatsCard 
+                    patient={patient} 
+                    calendarLogs={calendarLogs} 
+                    deadliftPR={deadliftPR}
+                    benchPressPR={benchPressPR}
+                    mileRunPR={mileRunPR}
+                    fiveKRunPR={fiveKRunPR}
+                  />
                 )}
 
-                {/* 🏋️ Personal Workout Tracker & Demographic Benchmarks */}
-                <WorkoutTracker patient={patient} />
+                {/* 🏋️ Personal Fitness Records & Demographic Benchmarks */}
+                <WorkoutTracker 
+                  patient={patient} 
+                  deadliftPR={deadliftPR}
+                  benchPressPR={benchPressPR}
+                  mileRunPR={mileRunPR}
+                  fiveKRunPR={fiveKRunPR}
+                  onUpdateDeadliftPR={(val) => setDeadliftPR(val)}
+                  onUpdateBenchPressPR={(val) => setBenchPressPR(val)}
+                  onUpdateMileRunPR={(val) => setMileRunPR(val)}
+                  onUpdateFiveKRunPR={(val) => setFiveKRunPR(val)}
+                />
 
                 {/* 🏃‍♂️ Apple Health Sync Overview */}
                 <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -1939,6 +1937,7 @@ export default function Dashboard() {
         patient={patient} 
         calendarLogs={calendarLogs}
         selectedDateLabel={activeDayLog.dateStr}
+        enableRPGSystem={enableRPGSystem}
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
         onLogWorkoutToCalendar={(exercise, details, targetDateStr) => handleLogWorkoutToCalendar(exercise, details, targetDateStr)}
         onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
