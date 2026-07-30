@@ -8,8 +8,8 @@ interface RPGStatsProps {
   calendarLogs: any[];
   deadliftPR?: number;
   benchPressPR?: number;
-  mileRunPR?: string; // e.g. "7:45"
-  fiveKRunPR?: string; // e.g. "24:30"
+  mileRunPR?: string;
+  fiveKRunPR?: string;
 }
 
 type JobRole = {
@@ -81,7 +81,7 @@ const JOB_ROLES: JobRole[] = [
 
 // Helper: Convert MM:SS string to total seconds
 function parseTimeToSeconds(timeStr: string): number {
-  if (!timeStr) return 480; // default 8 mins
+  if (!timeStr) return 480;
   const parts = timeStr.split(':');
   if (parts.length === 2) {
     return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
@@ -101,35 +101,34 @@ export default function RPGStatsCard({
   const activeJob = JOB_ROLES.find((j) => j.id === selectedJobId) || JOB_ROLES[0];
 
   // --- 1. DYNAMIC STRENGTH (STR) ---
-  // Influenced by Deadlift PR + Bench Press PR
+  // Calculates score relative to lifting benchmarks
   const deadliftScore = (deadliftPR / 400) * 100;
   const benchScore = (benchPressPR / 300) * 100;
   const strStat = Math.min(100, Math.round((deadliftScore * 0.6) + (benchScore * 0.4)));
 
   // --- 2. DYNAMIC ENDURANCE (END) ---
-  // Influenced by Daily Steps (7,420 / 8k) + 1 Mile Run Time + 5K Time
+  // Calculates score relative to steps + mile run time
   const stepScore = Math.min(100, (7420 / 8000) * 100);
   const mileSeconds = parseTimeToSeconds(mileRunPR);
-  // Benchmark: 5:00 (100 pts) down to 10:00 (50 pts)
   const mileScore = Math.max(30, Math.min(100, Math.round(150 - (mileSeconds / 6)))); 
   const endStat = Math.min(100, Math.round((stepScore * 0.5) + (mileScore * 0.5)));
 
   // --- 3. DYNAMIC VITALITY (VIT) ---
-  // Influenced by Resting Heart Rate + Blood Pressure Status
+  // Calculates score based on resting HR and blood pressure
   const hr = parseInt(patient?.vitals?.heartRate || '68', 10);
   const hrScore = Math.max(20, Math.min(100, 150 - hr));
   const isBPNormal = patient?.vitals?.bpStatus === 'normal';
   const vitStat = Math.min(100, Math.round(isBPNormal ? hrScore : hrScore * 0.85));
 
   // --- 4. DYNAMIC RECOVERY (REC) ---
-  // Influenced by 28-Day Sleep Average + Daily Stress Score
+  // Calculates score based on sleep average minus stress penalty
   const avgSleep = calendarLogs.reduce((acc, curr) => acc + (curr.sleepHours || 7), 0) / (calendarLogs.length || 1);
   const sleepScore = (avgSleep / 8) * 100;
   const avgStress = calendarLogs.reduce((acc, curr) => acc + (curr.stressLevel || 4), 0) / (calendarLogs.length || 1);
-  const stressPenalty = (avgStress / 10) * 15; // Penalty up to 15 points
+  const stressPenalty = (avgStress / 10) * 15;
   const recStat = Math.max(10, Math.min(100, Math.round(sleepScore - stressPenalty)));
 
-  // Overall Character Level (Fully Dynamic across all trackers)
+  // Overall Character Level
   const charLevel = Math.round((strStat + endStat + vitStat + recStat) / 4);
   const expPercent = 74;
 
@@ -179,9 +178,9 @@ export default function RPGStatsCard({
         </div>
       </div>
 
-      {/* DYNAMIC STATS GRID */}
+      {/* STATS GRID */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* STR (INFLUENCED BY DEADLIFT + BENCH) */}
+        {/* STR */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'STR' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-purple-500/30'
         }`}>
@@ -197,7 +196,7 @@ export default function RPGStatsCard({
           </span>
         </div>
 
-        {/* END (INFLUENCED BY STEPS + RUN TIMES) */}
+        {/* END */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'END' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-sky-500/30'
         }`}>
@@ -213,7 +212,7 @@ export default function RPGStatsCard({
           </span>
         </div>
 
-        {/* VIT (INFLUENCED BY RESTING HR + BP) */}
+        {/* VIT */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'VIT' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-rose-500/30'
         }`}>
@@ -229,7 +228,7 @@ export default function RPGStatsCard({
           </span>
         </div>
 
-        {/* REC (INFLUENCED BY SLEEP + STRESS INDEX) */}
+        {/* REC */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'REC' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-emerald-500/30'
         }`}>

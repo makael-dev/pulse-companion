@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server';
 
-// Red Flag Emergency Keywords for Instant Safety Guardrail
+// Red Flag Emergency Keywords
 const EMERGENCY_PATTERNS = [
   /chest pain/i, /shortness of breath/i, /difficulty breathing/i, /can't breathe/i,
   /stroke/i, /numbness/i, /face drooping/i, /fainted/i, /fainting/i, /severe bleeding/i, /suicidal/i
 ];
 
-// Helper: Resolve relative or explicit dates
 function resolveTargetDate(text: string, defaultLabel: string): string {
   const lower = text.toLowerCase();
+  const today = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  if (lower.includes('yesterday') || lower.includes('yest')) return 'Jul 28';
-  if (lower.includes('today')) return 'Jul 29';
+  if (lower.includes('yesterday') || lower.includes('yest')) {
+    const yest = new Date(today);
+    yest.setDate(today.getDate() - 1);
+    return `${monthNames[yest.getMonth()]} ${yest.getDate()}`;
+  }
+  if (lower.includes('today')) {
+    return `${monthNames[today.getMonth()]} ${today.getDate()}`;
+  }
 
   const monthRegex = /(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s*(\d{1,2})(st|nd|rd|th)?/i;
   const match = text.match(monthRegex);
@@ -25,7 +32,6 @@ function resolveTargetDate(text: string, defaultLabel: string): string {
   return defaultLabel;
 }
 
-// Function definitions for OpenAI Tool Calling
 const TOOLS = [
   {
     type: 'function',
@@ -35,7 +41,7 @@ const TOOLS = [
       parameters: {
         type: 'OBJECT',
         properties: {
-          targetDateStr: { type: 'STRING', description: 'The date string to log for (e.g. Jul 4, Jul 28, Jul 29).' }
+          targetDateStr: { type: 'STRING', description: 'The date string to log for (e.g. Jul 29, Jul 30).' }
         },
         required: ['targetDateStr']
       }
@@ -76,8 +82,9 @@ const TOOLS = [
 
 export async function POST(req: Request) {
   try {
-    const { messages, patient, selectedDateLabel, calendarLogs, enableRPGSystem = true } = await req.json();
+    const { messages, patient, selectedDateLabel, calendarLogs, enableRPGSystem = false } = await req.json();
     const lastMessage = messages[messages.length - 1]?.text || '';
+    const lower = lastMessage.toLowerCase();
     const targetDate = resolveTargetDate(lastMessage, selectedDateLabel);
 
     // 🚨 1. Safety Triage Guardrail
@@ -88,15 +95,27 @@ export async function POST(req: Request) {
       });
     }
 
-    // 🧠 2. Extract Active UI Fitness & Health State
+    // 📅 2. DATE / TODAY QUERY DIRECT HANDLER
+    if (
+      lower.includes('what day is it') ||
+      lower.includes('what is today') ||
+      lower.includes('today\'s date') ||
+      lower.includes('what date is it') ||
+      lower.includes('what is the date')
+    ) {
+      const liveDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+      return NextResponse.json({
+        reply: `📅 **Today's Date:** Today is **${liveDateStr}**.\n\nYou are currently viewing health logs for **${selectedDateLabel}** on your dashboard.`,
+        chips: ['View Calendar', 'What are my vitals?', 'Log meds taken']
+      });
+    }
+
     const vitals = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', bmi: '24.1' };
     const medications = patient?.medications || [];
     
-    // Active Day Log Context
     const activeLog = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === selectedDateLabel.toLowerCase());
     const dayMedsTaken = activeLog?.medsTaken || {};
 
-    // Dynamic Gamification System Instruction Block
     const gamificationPrompt = enableRPGSystem ? `
 CHARACTER STATS & GAMIFICATION SHEET STATE:
 - Character Role: Warrior (WAR) [Tank Class] | Overall Level: LVL 87
@@ -110,11 +129,11 @@ GAMIFICATION SYSTEM DISABLED BY USER PREFERENCE:
 - DO NOT refer to character levels, job titles (Warrior, Paladin, etc.), XP, or gamified stats. Stick strictly to standard clinical metrics, vital signs, and physical fitness tracking.
 `;
 
-    // 🤖 3. Comprehensive System Prompt
     const systemPrompt = `
 You are Pulse Companion AI, an intelligent personal health and administrative visit navigation assistant.
 
 LIVE PATIENT EHR & DASHBOARD STATE:
+- Current System Date: ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
 - Patient Name: ${patient?.name || 'Ezekiel Walter'} (Age ${patient?.age || 42}, ${patient?.gender || 'Male'})
 - Primary Provider: ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD'}
 - Current Vitals: Blood Pressure ${vitals.bp} (${vitals.bpStatus || 'Normal'}), Resting HR ${vitals.heartRate}, HbA1c ${vitals.hba1c}, BMI ${vitals.bmi || '24.1'}
@@ -124,14 +143,13 @@ LIVE PATIENT EHR & DASHBOARD STATE:
 ${gamificationPrompt}
 
 BEHAVIORAL INSTRUCTIONS:
-1. Answer all health, vitals, stats, and medication questions conversationally, accurately, and empathetically.
-2. If asked about BP (e.g. "What does my BP mean?"), evaluate their specific Blood Pressure (${vitals.bp}) and explain that 118/78 mmHg is in the optimal normal range for heart health.
-3. If asked about fitness stats or character levels, explain how their specific numbers calculated that metric (unless gamification is disabled, in which case explain physical performance directly).
+1. Answer all health, vitals, stats, date, and medication questions conversationally, accurately, and empathetically.
+2. If asked what day/date it is, answer with today's live date directly.
+3. If asked about BP (e.g. "What does my BP mean?"), evaluate their specific Blood Pressure (${vitals.bp}) and explain that 118/78 mmHg is in the optimal normal range for heart health.
 4. If the user wants to log medications, workouts, or notes, execute the appropriate tool function call.
 5. Provide 3 short, relevant quick-reply suggestion chips at the end of helpful responses.
 `;
 
-    // ⚡ 4. OpenAI API Call with Full Context
     if (process.env.OPENAI_API_KEY) {
       const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -158,7 +176,6 @@ BEHAVIORAL INSTRUCTIONS:
         const data = await apiResponse.json();
         const choice = data.choices?.[0]?.message;
 
-        // Handle Function Tool Calls
         if (choice?.tool_calls && choice.tool_calls.length > 0) {
           const toolCall = choice.tool_calls[0];
           const fnName = toolCall.function.name;
@@ -186,7 +203,6 @@ BEHAVIORAL INSTRUCTIONS:
           return NextResponse.json({ reply, chips, action });
         }
 
-        // Return Direct LLM Text Response
         if (choice?.content) {
           return NextResponse.json({
             reply: choice.content,
@@ -196,9 +212,9 @@ BEHAVIORAL INSTRUCTIONS:
       }
     }
 
-    // Fallback response if API key is missing
+    const liveDateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return NextResponse.json({
-      reply: `I can help with your health record! Your Blood Pressure is ${vitals.bp} (Normal).`,
+      reply: `I can help with your health record! Today is ${liveDateStr}. Your Blood Pressure is ${vitals.bp} (Normal).`,
       chips: ['What are my vitals?', 'Log meds taken', 'View Calendar']
     });
 
