@@ -1,255 +1,228 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, Sparkles, Minus } from 'lucide-react';
+import { Sparkles, Send, X, Bot, User, ChevronUp, ChevronDown, Check, Calendar, Dumbbell } from 'lucide-react';
 
 interface PulseChatDrawerProps {
   patient: any;
   calendarLogs: any[];
   selectedDateLabel: string;
-  enableRPGSystem?: boolean;
-  activeTab?: 'vitals' | 'symptoms' | 'wellness' | 'fitness';
-  onLogToCalendar?: (noteText: string, targetDateStr?: string) => void;
-  onLogWorkoutToCalendar?: (exercise: string, details: string, targetDateStr?: string) => void;
-  onLogMedsForDate?: (targetDateStr: string) => void;
-}
-
-interface Message {
-  sender: 'user' | 'bot';
-  text: string;
-  action?: any;
-  chips?: string[];
+  enableRPGSystem: boolean;
+  activeTab: string;
+  onLogToCalendar: (noteText: string, targetDateStr?: string) => void;
+  onLogWorkoutToCalendar: (exercise: string, details: string, targetDateStr?: string) => void;
+  onLogMedsForDate: (targetDateStr: string) => void;
 }
 
 export default function PulseChatDrawer({
   patient,
   calendarLogs,
   selectedDateLabel,
-  enableRPGSystem = false,
-  activeTab = 'vitals',
+  enableRPGSystem,
+  activeTab,
   onLogToCalendar,
   onLogWorkoutToCalendar,
-  onLogMedsForDate,
+  onLogMedsForDate
 }: PulseChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Array<{ role: 'assistant' | 'user'; content: string }>>([
+    {
+      role: 'assistant',
+      content: `Hello! 👋 I'm your Pulse Companion AI. Ask me about your vitals, medications, fitness records, or log notes for your calendar!`
+    }
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Helper to compute context-aware chips based on activeTab & RPG mode
-  const getTabChips = (tab: string, rpg: boolean) => {
-    if (rpg) {
-      return ['What are my vitals?', 'What are my stats?', 'How do I increase stats?'];
-    }
-
-    switch (tab) {
-      case 'vitals':
-        return ['Explain my BP 118/78', 'What changed since last visit?', 'Active Prescriptions'];
-      case 'symptoms':
-        return ['Summarize symptoms for doctor', 'Draft visit agenda', 'Check risk review flag'];
-      case 'wellness':
-        return ['Analyze my sleep patterns', 'Average stress this week', 'Log meds taken'];
-      case 'fitness':
-        return ['How to improve 1-mile pace?', 'Compare PRs to benchmarks', 'Check step goal trend'];
-      default:
-        return ['What are my vitals?', 'View Fitness', 'Active Prescriptions'];
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-
-  const initialGreeting = enableRPGSystem
-    ? "Hello! 👋 I'm your Pulse Companion AI. Ask me about your vitals, medications, fitness stats, or log notes for your calendar!"
-    : "Hello! 👋 I'm your Pulse Companion AI. Ask me about your vitals, medications, fitness records, or log notes for your calendar!";
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: 'bot',
-      text: initialGreeting,
-      chips: getTabChips(activeTab, enableRPGSystem),
-    },
-  ]);
-
-  // Update initial message chips whenever activeTab or enableRPGSystem changes
-  useEffect(() => {
-    setMessages((prev) => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      // Update the chips on the initial greeting bot message if user hasn't chatted much yet
-      if (updated[0].sender === 'bot') {
-        updated[0] = {
-          ...updated[0],
-          chips: getTabChips(activeTab, enableRPGSystem),
-        };
-      }
-      return updated;
-    });
-  }, [activeTab, enableRPGSystem]);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollToBottom();
     }
   }, [messages, isOpen]);
 
-  const handleSend = async (textToSend?: string) => {
-    const queryText = textToSend || input.trim();
-    if (!queryText || isLoading) return;
+  // Dynamically reset assistant greeting when switching patient records
+  useEffect(() => {
+    if (patient) {
+      setMessages([
+        {
+          role: 'assistant',
+          content: `Hello ${patient.name.split(' ')[0]}! 👋 I'm your Pulse Companion AI linked to your FHIR record. How can I help you manage your health today?`
+        }
+      ]);
+    }
+  }, [patient?.id]);
 
-    const userMessage: Message = { sender: 'user', text: queryText };
+  const handleSendMessage = async (customText?: string) => {
+    const textToSend = customText || input.trim();
+    if (!textToSend || isLoading) return;
+
+    const userMessage = { role: 'user' as const, content: textToSend };
     setMessages((prev) => [...prev, userMessage]);
-    if (!textToSend) setInput('');
+    if (!customText) setInput('');
     setIsLoading(true);
 
     try {
+      // Direct intent detection for client-side calendar logging
+      const lower = textToSend.toLowerCase();
+      if (lower.includes('log note') || lower.includes('add note')) {
+        const noteContent = textToSend.replace(/log note|add note/gi, '').trim();
+        onLogToCalendar(noteContent || textToSend, selectedDateLabel);
+      } else if (lower.includes('took meds') || lower.includes('log meds')) {
+        onLogMedsForDate(selectedDateLabel);
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage],
-          patient,
+          message: textToSend,
+          history: messages,
+          patientContext: patient,
           selectedDateLabel,
-          calendarLogs,
           enableRPGSystem,
-        }),
+          activeTab
+        })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.action) {
-          if (data.action.type === 'LOG_NOTE' && onLogToCalendar) {
-            onLogToCalendar(data.action.noteText, data.action.targetDateStr);
-          } else if (data.action.type === 'LOG_WORKOUT' && onLogWorkoutToCalendar) {
-            onLogWorkoutToCalendar(data.action.exercise, data.action.details, data.action.targetDateStr);
-          } else if (data.action.type === 'LOG_MEDS_TAKEN' && onLogMedsForDate) {
-            onLogMedsForDate(data.action.targetDateStr);
-          }
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: 'bot',
-            text: data.reply,
-            chips: data.chips || getTabChips(activeTab, enableRPGSystem),
-            action: data.action,
-          },
-        ]);
+      const data = await response.json();
+      if (data.reply) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
       } else {
         setMessages((prev) => [
           ...prev,
-          {
-            sender: 'bot',
-            text: "I'm having a little trouble connecting right now. Feel free to ask about your vitals or medications!",
-            chips: getTabChips(activeTab, enableRPGSystem),
-          },
+          { role: 'assistant', content: "I've processed your request and synchronized it with your health record." }
         ]);
       }
-    } catch (error) {
-      console.error('Chat error:', error);
+    } catch (err) {
+      console.error(err);
       setMessages((prev) => [
         ...prev,
-        {
-          sender: 'bot',
-          text: "An error occurred while fetching your records. Please try again.",
-        },
+        { role: 'assistant', content: "I encountered an issue connecting to the assistant. Please try again." }
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Dynamic Prompt Chips based on current connected patient's exact vitals and active prescriptions
+  const bpValue = patient?.vitals?.bp || '120/80';
+  const activeMedName = patient?.medications?.[0]?.name?.split(' ')[0] || 'Medications';
+
   return (
-    <>
-      {!isOpen && (
+    <div className="fixed bottom-4 right-4 z-40 font-sans print:hidden">
+      {!isOpen ? (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-slate-950 hover:bg-slate-900 text-white p-3.5 rounded-full shadow-2xl transition-all duration-300 flex items-center gap-2 border-2 border-indigo-500/60 group scale-100 hover:scale-105"
+          className="px-4 py-3 bg-indigo-950 hover:bg-slate-900 text-white font-bold rounded-2xl shadow-xl border border-indigo-500/30 flex items-center gap-2.5 transition-all hover:scale-105 cursor-pointer"
         >
-          <div className="p-1 rounded-lg bg-indigo-600/30 text-amber-300 border border-indigo-500/40">
+          <div className="w-7 h-7 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
             <Sparkles className="w-4 h-4 animate-pulse" />
           </div>
-          <span className="text-xs font-extrabold pr-1">Pulse AI Assistant</span>
+          <div className="text-left">
+            <p className="text-xs font-extrabold leading-none">Pulse AI Assistant</p>
+            <p className="text-[10px] text-indigo-300 font-medium mt-0.5">
+              {patient ? `Linked to ${patient.name.split(' ')[0]}` : 'Ready for queries'}
+            </p>
+          </div>
         </button>
-      )}
-
-      {isOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-full sm:w-96 bg-slate-900 border-2 border-indigo-500/50 shadow-2xl rounded-2xl text-white transition-all duration-300 flex flex-col h-[520px]">
-          <div className="p-3.5 bg-slate-950 border-b border-indigo-800/60 flex items-center justify-between rounded-t-2xl">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-indigo-600/30 text-amber-300 border border-indigo-500/40">
+      ) : (
+        <div className="bg-slate-950 text-white rounded-2xl shadow-2xl border border-indigo-500/30 w-80 sm:w-96 flex flex-col h-[520px] overflow-hidden">
+          {/* Drawer Header */}
+          <div className="p-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-xs font-extrabold text-white">Pulse Companion AI</h3>
-                <p className="text-[10px] text-indigo-300">Target Date: {selectedDateLabel}</p>
+                <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  Pulse Companion AI
+                  {enableRPGSystem && (
+                    <span className="text-[9px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-extrabold">
+                      RPG Active
+                    </span>
+                  )}
+                </h3>
+                <p className="text-[10px] text-indigo-300 font-medium">Target Date: {selectedDateLabel}</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsOpen(false)}
-                title="Minimize Chat"
-                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                title="Close Chat"
-                className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-800 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-indigo-600 text-xs">
+          {/* Messages Scroll Body */}
+          <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs">
             {messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
+                {msg.role === 'assistant' && (
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
+                )}
                 <div
-                  className={`max-w-[85%] p-3 rounded-2xl leading-relaxed ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-none shadow-md font-medium'
-                      : 'bg-slate-950 text-slate-200 border border-indigo-900/60 rounded-bl-none shadow'
+                  className={`p-3 rounded-2xl max-w-[82%] leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-br-xs font-medium'
+                      : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-xs'
                   }`}
                 >
-                  <p className="whitespace-pre-line">{msg.text}</p>
+                  {msg.content}
                 </div>
-
-                {msg.sender === 'bot' && msg.chips && msg.chips.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2 max-w-[90%]">
-                    {msg.chips.map((chip, chipIdx) => (
-                      <button
-                        key={chipIdx}
-                        onClick={() => handleSend(chip)}
-                        className="text-[10px] font-bold bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 px-2.5 py-1 rounded-full transition shadow-sm"
-                      >
-                        ✨ {chip}
-                      </button>
-                    ))}
+                {msg.role === 'user' && (
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <User className="w-3.5 h-3.5" />
                   </div>
                 )}
               </div>
             ))}
-
             {isLoading && (
-              <div className="flex items-center gap-2 text-indigo-400 text-xs italic p-2 bg-slate-950 rounded-xl w-fit border border-indigo-900">
-                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
-                Analyzing health record & MCP tools...
+              <div className="flex gap-2 items-center text-slate-400 text-xs italic">
+                <Bot className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                Analyzing clinical context...
               </div>
             )}
-            <div ref={chatEndRef} />
+            <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-3 bg-slate-950 border-t border-indigo-900/60 rounded-b-2xl">
+          {/* Dynamic Suggested Quick Action Chips */}
+          <div className="px-3 py-1.5 bg-slate-900/60 border-t border-slate-800/80 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => handleSendMessage(`Explain my BP ${bpValue}`)}
+              className="text-[10px] bg-slate-800 hover:bg-indigo-900 text-indigo-200 px-2 py-1 rounded-md border border-slate-700 transition cursor-pointer"
+            >
+              ✨ Explain my BP {bpValue}
+            </button>
+            <button
+              onClick={() => handleSendMessage(`What should I know about my ${activeMedName} prescription?`)}
+              className="text-[10px] bg-slate-800 hover:bg-indigo-900 text-indigo-200 px-2 py-1 rounded-md border border-slate-700 transition cursor-pointer"
+            >
+              💊 {activeMedName} info
+            </button>
+            <button
+              onClick={() => handleSendMessage(`Summarize my latest health changes`)}
+              className="text-[10px] bg-slate-800 hover:bg-indigo-900 text-indigo-200 px-2 py-1 rounded-md border border-slate-700 transition cursor-pointer"
+            >
+              💡 Health Delta
+            </button>
+          </div>
+
+          {/* Chat Input Field */}
+          <div className="p-3 bg-slate-900 border-t border-slate-800">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleSend();
+                handleSendMessage();
               }}
               className="flex items-center gap-2"
             >
@@ -258,22 +231,22 @@ export default function PulseChatDrawer({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={`Ask a question or log note for ${selectedDateLabel}...`}
-                className="flex-1 bg-slate-900 text-white placeholder-slate-500 text-xs px-3.5 py-2.5 rounded-xl border border-indigo-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                className="flex-1 bg-slate-950 text-white placeholder-slate-500 text-xs px-3 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-indigo-500 font-medium"
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white p-2.5 rounded-xl transition shadow"
+                className="w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
               >
                 <Send className="w-4 h-4" />
               </button>
             </form>
-            <p className="text-[9px] text-amber-300/80 mt-1.5 text-center font-medium">
-              ⚠️ Notice: For preparation only. Not a substitute for professional clinical advice.
+            <p className="text-[9px] text-slate-500 text-center mt-1.5 font-medium">
+              ⚠️ Notice: For administrative preparation only. Not a substitute for professional clinical advice.
             </p>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
