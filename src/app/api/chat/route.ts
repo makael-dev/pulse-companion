@@ -116,7 +116,22 @@ export async function POST(req: Request) {
       });
     }
 
-    // 💡 3. REAL CLINICAL HEALTH SUMMARY / DELTA HANDLER
+    // 🩸 3. DIRECT BP EXPLANATION HANDLER
+    if (lower.includes('explain') || lower.includes('bp') || lower.includes('blood pressure')) {
+      const bp = patient?.vitals?.bp || '120/80 mmHg';
+      const isElevated = patient?.vitals?.bpStatus === 'warning';
+
+      const bpReply = isElevated
+        ? `🩸 **Blood Pressure Explanation (${bp}):** Your current reading reflects slightly elevated pressure. It's recommended to track daily and review with your physician.`
+        : `🩸 **Blood Pressure Explanation (${bp}):** A reading of **${bp}** is optimal and normal! The top number (systolic) measures pressure when your heart pumps, while the bottom number (diastolic) measures pressure between beats.`;
+
+      return NextResponse.json({
+        reply: bpReply,
+        chips: ['Active Prescriptions', 'Health Delta', 'View Calendar']
+      });
+    }
+
+    // 💡 4. REAL CLINICAL HEALTH SUMMARY / DELTA HANDLER
     if (lower.includes('summarize') || lower.includes('health changes') || lower.includes('delta')) {
       const bp = patient?.vitals?.bp || '120/80 mmHg';
       const bpStatus = patient?.vitals?.bpStatus === 'warning' ? '⚠️ Elevated' : 'Normal';
@@ -139,40 +154,10 @@ export async function POST(req: Request) {
 
     const vitals = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', bmi: '24.1' };
     const medications = patient?.medications || [];
-    
-    const activeLog = calendarLogs?.find((l: any) => l.dateStr?.toLowerCase() === selectedDateLabel.toLowerCase());
-    const dayMedsTaken = activeLog?.medsTaken || {};
-
-    const gamificationPrompt = enableRPGSystem ? `
-CHARACTER STATS & GAMIFICATION SHEET STATE:
-- Character Role: Warrior (WAR) [Tank Class] | Overall Level: LVL 87
-- Strength (STR 100): Driven by Deadlift & Bench Press PRs.
-- Endurance (END 83): Driven by step counts and 1-Mile run pace.
-- Vitality (VIT 82): Driven by resting HR (${vitals.heartRate}) and stable blood pressure (${vitals.bp}).
-` : `
-GAMIFICATION SYSTEM DISABLED BY USER PREFERENCE:
-- The user has disabled the RPG Fitness & Job System in Privacy Controls.
-- DO NOT refer to character levels, job titles, or XP. Stick strictly to standard clinical metrics and vitals.
-`;
 
     const systemPrompt = `
-You are Pulse Companion AI, an intelligent personal health and administrative visit navigation assistant.
-
-LIVE PATIENT EHR & DASHBOARD STATE:
-- Current System Date: ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-- Patient Name: ${patient?.name || 'Ezekiel Walter'} (Age ${patient?.age || 42}, ${patient?.gender || 'Male'})
-- Primary Provider: ${patient?.primaryDoctor || 'Dr. Sarah Vance, MD'}
-- Current Vitals: Blood Pressure ${vitals.bp} (${vitals.bpStatus || 'Normal'}), Resting HR ${vitals.heartRate}, HbA1c ${vitals.hba1c}, BMI ${vitals.bmi || '24.1'}
-- Prescriptions: ${JSON.stringify(medications.map((m: any) => m.name))}
-- Currently Selected Calendar Date: ${selectedDateLabel} (Logged Meds: ${JSON.stringify(dayMedsTaken)})
-
-${gamificationPrompt}
-
-BEHAVIORAL INSTRUCTIONS:
-1. Answer all health, vitals, stats, date, and medication questions conversationally, accurately, and empathetically.
-2. If asked about BP, evaluate their specific Blood Pressure (${vitals.bp}) and explain its range clearly.
-3. If the user wants to log medications, workouts, or notes, execute the appropriate tool function call.
-4. Provide 3 short, relevant quick-reply suggestion chips at the end of helpful responses.
+You are Pulse Companion AI, an intelligent personal health assistant for ${patient?.name || 'Patient'}.
+Current Vitals: Blood Pressure ${vitals.bp}, HR ${vitals.heartRate}, HbA1c ${vitals.hba1c}.
 `;
 
     if (process.env.OPENAI_API_KEY) {
@@ -201,37 +186,10 @@ BEHAVIORAL INSTRUCTIONS:
         const data = await apiResponse.json();
         const choice = data.choices?.[0]?.message;
 
-        if (choice?.tool_calls && choice.tool_calls.length > 0) {
-          const toolCall = choice.tool_calls[0];
-          const fnName = toolCall.function.name;
-          const args = JSON.parse(toolCall.function.arguments || '{}');
-          const dateForAction = args.targetDateStr || targetDate;
-
-          let reply = '';
-          let chips: string[] = [];
-          let action: any = null;
-
-          if (fnName === 'log_medications_taken') {
-            reply = `✅ **Medication Log Updated for ${dateForAction}:** Marked active prescription doses as taken!`;
-            action = { type: 'LOG_MEDS_TAKEN', targetDateStr: dateForAction };
-            chips = ['View Calendar', 'What are my vitals?', enableRPGSystem ? 'What are my stats?' : 'View Fitness'];
-          } else if (fnName === 'log_workout') {
-            reply = `🏃‍♂️ **Logged Workout for ${dateForAction}:** ${args.exercise} (${args.details}). Workout log updated!`;
-            action = { type: 'LOG_WORKOUT', exercise: args.exercise, details: args.details, targetDateStr: dateForAction };
-            chips = [enableRPGSystem ? 'What are my stats?' : 'View Fitness', 'View Calendar', 'Check Vitals'];
-          } else if (fnName === 'log_context_note') {
-            reply = `📝 **Logged Note for ${dateForAction}:** "${args.noteText}". Updated in your calendar log!`;
-            action = { type: 'LOG_NOTE', noteText: args.noteText, targetDateStr: dateForAction };
-            chips = ['View Calendar', 'Log Meds Taken', 'Check Vitals'];
-          }
-
-          return NextResponse.json({ reply, chips, action });
-        }
-
         if (choice?.content) {
           return NextResponse.json({
             reply: choice.content,
-            chips: ['What are my vitals?', enableRPGSystem ? 'What are my stats?' : 'View Fitness', 'Active Prescriptions']
+            chips: ['What are my vitals?', 'Active Prescriptions', 'View Calendar']
           });
         }
       }

@@ -17,12 +17,12 @@ const VISIT_TYPES = [
 ];
 
 const MOCK_PATIENTS_FALLBACK = [
-  { id: 'mb-01', name: 'Paul Tremblay', email: 'paul.tremblay@medblocks.com', gender: 'Male', dob: '1976-07-07', age: 50 },
-  { id: 'mb-02', name: 'Larissa Nikolaus', email: 'larissa.nikolaus@medblocks.com', gender: 'Female', dob: '1988-11-14', age: 38 },
-  { id: 'mb-03', name: 'Cristobal Montero', email: 'cristobal.montero@medblocks.com', gender: 'Male', dob: '1985-03-22', age: 41 },
-  { id: 'mb-04', name: 'Ezekiel Walter', email: 'ezekiel.walter@medblocks.com', gender: 'Male', dob: '1984-09-10', age: 42 },
-  { id: 'mb-05', name: 'Maya Lin', email: 'maya.lin@medblocks.com', gender: 'Female', dob: '1987-03-22', age: 39 },
-  { id: 'mb-06', name: 'Marcus Sterling', email: 'marcus.sterling@medblocks.com', gender: 'Male', dob: '1974-05-18', age: 52 },
+  { id: 'mb-01', name: 'Paul Tremblay', email: 'paul.tremblay@medblocks.com', gender: 'male', dob: '1976-07-07', age: 50 },
+  { id: 'mb-02', name: 'Larissa Nikolaus', email: 'larissa.nikolaus@medblocks.com', gender: 'female', dob: '1988-11-14', age: 38 },
+  { id: 'mb-03', name: 'Cristobal Montero', email: 'cristobal.montero@medblocks.com', gender: 'male', dob: '1985-03-22', age: 41 },
+  { id: 'mb-04', name: 'Ezekiel Walter', email: 'ezekiel.walter@medblocks.com', gender: 'male', dob: '1984-09-10', age: 42 },
+  { id: 'mb-05', name: 'Maya Lin', email: 'maya.lin@medblocks.com', gender: 'female', dob: '1987-03-22', age: 39 },
+  { id: 'mb-06', name: 'Marcus Sterling', email: 'marcus.sterling@medblocks.com', gender: 'male', dob: '1974-05-18', age: 52 },
 ];
 
 export async function GET() {
@@ -59,6 +59,7 @@ function formatPatientRecord(p: any) {
   const email = p.email || `${fullName.toLowerCase().replace(/\s+/g, '.')}@medblocks.com`;
   const hash = fullName.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
 
+  // 1. DYNAMIC DOB & AGE
   const rawDob = p.birthDate || p.birth_date || p.dob || p.dateOfBirth;
   let dob = rawDob;
   if (!dob) {
@@ -71,17 +72,12 @@ function formatPatientRecord(p: any) {
   const birthYear = new Date(dob).getFullYear();
   const calculatedAge = !isNaN(birthYear) ? 2026 - birthYear : 40;
 
-  let rawGender = p.gender || p.sex || '';
-  if (!rawGender) {
-    const lower = fullName.toLowerCase();
-    if (lower.includes('marcus') || lower.includes('ezekiel') || lower.includes('paul') || lower.includes('eliseo') || lower.includes('cristobal') || lower.includes('aris')) {
-      rawGender = 'Male';
-    } else {
-      rawGender = 'Female';
-    }
-  }
-  const formattedGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
+  // 2. GENDER DIRECTLY FROM HEALTH RECORD PAYLOAD
+  // Checks raw FHIR gender, sex, or patient profile object fields directly
+  const rawRecordGender = p.gender || p.sex || p.patient_gender || p.administrativeGender || 'Unspecified';
+  const formattedGender = rawRecordGender.charAt(0).toUpperCase() + rawRecordGender.slice(1).toLowerCase();
 
+  // 3. DYNAMIC DEMOGRAPHICS & CONTACTS
   const phone = p.phone || p.telecom?.[0]?.value || `(555) ${Math.floor(100 + (hash % 800))}-${Math.floor(1000 + (hash * 3 % 8999))}`;
   const location = p.location || (p.address?.[0]?.city ? `${p.address[0].city}, ${p.address[0].state || 'MA'}` : 'Boston, MA');
 
@@ -93,6 +89,7 @@ function formatPatientRecord(p: any) {
   const lastVisitDate = p.last_visit_date || `July ${lastVisitDay}, 2026`;
   const nextVisitDate = p.nextVisit?.date || `August ${nextVisitDay}, 2026`;
 
+  // Height Math (Correct Inches Rollover)
   const totalInches = 62 + (hash % 14);
   const feet = Math.floor(totalInches / 12);
   const inches = totalInches % 12;
