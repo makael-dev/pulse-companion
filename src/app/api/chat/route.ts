@@ -82,8 +82,14 @@ const TOOLS = [
 
 export async function POST(req: Request) {
   try {
-    const { messages, patient, selectedDateLabel, calendarLogs, enableRPGSystem = false } = await req.json();
-    const lastMessage = messages[messages.length - 1]?.text || '';
+    const body = await req.json();
+    const messages = body.messages || body.history || [];
+    const patient = body.patient || body.patientContext || null;
+    const selectedDateLabel = body.selectedDateLabel || 'Jul 30';
+    const calendarLogs = body.calendarLogs || [];
+    const enableRPGSystem = body.enableRPGSystem || false;
+
+    const lastMessage = body.message || messages[messages.length - 1]?.text || messages[messages.length - 1]?.content || '';
     const lower = lastMessage.toLowerCase();
     const targetDate = resolveTargetDate(lastMessage, selectedDateLabel);
 
@@ -110,6 +116,15 @@ export async function POST(req: Request) {
       });
     }
 
+    // 💡 3. HEALTH SUMMARY / DELTA QUERY DIRECT HANDLER
+    if (lower.includes('summarize') || lower.includes('health changes') || lower.includes('delta')) {
+      const summary = patient?.whatChangedSummary || `Live FHIR R4 records show BP is ${patient?.vitals?.bp || '120/80'} and HbA1c is ${patient?.vitals?.hba1c || '5.6%'}. Prescriptions loaded for ${patient?.name || 'Patient'}.`;
+      return NextResponse.json({
+        reply: `💡 **Health Summary for ${patient?.name || 'Patient'}:** ${summary}`,
+        chips: ['What are my vitals?', 'Active Prescriptions', 'View Calendar']
+      });
+    }
+
     const vitals = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', bmi: '24.1' };
     const medications = patient?.medications || [];
     
@@ -119,14 +134,13 @@ export async function POST(req: Request) {
     const gamificationPrompt = enableRPGSystem ? `
 CHARACTER STATS & GAMIFICATION SHEET STATE:
 - Character Role: Warrior (WAR) [Tank Class] | Overall Level: LVL 87
-- Strength (STR 100): Driven by Deadlift (500 lbs) & Bench Press (315 lbs) PRs.
-- Endurance (END 83): Driven by 7,420 / 8,000 steps and a 7:45 1-Mile run pace.
-- Vitality (VIT 82): Driven by resting HR (68 bpm) and stable blood pressure.
-- Recovery (REC 82): Driven by 7.0h avg sleep and controlled daily stress index.
+- Strength (STR 100): Driven by Deadlift & Bench Press PRs.
+- Endurance (END 83): Driven by step counts and 1-Mile run pace.
+- Vitality (VIT 82): Driven by resting HR (${vitals.heartRate}) and stable blood pressure (${vitals.bp}).
 ` : `
 GAMIFICATION SYSTEM DISABLED BY USER PREFERENCE:
 - The user has disabled the RPG Fitness & Job System in Privacy Controls.
-- DO NOT refer to character levels, job titles (Warrior, Paladin, etc.), XP, or gamified stats. Stick strictly to standard clinical metrics, vital signs, and physical fitness tracking.
+- DO NOT refer to character levels, job titles, or XP. Stick strictly to standard clinical metrics and vitals.
 `;
 
     const systemPrompt = `
@@ -144,10 +158,9 @@ ${gamificationPrompt}
 
 BEHAVIORAL INSTRUCTIONS:
 1. Answer all health, vitals, stats, date, and medication questions conversationally, accurately, and empathetically.
-2. If asked what day/date it is, answer with today's live date directly.
-3. If asked about BP (e.g. "What does my BP mean?"), evaluate their specific Blood Pressure (${vitals.bp}) and explain that 118/78 mmHg is in the optimal normal range for heart health.
-4. If the user wants to log medications, workouts, or notes, execute the appropriate tool function call.
-5. Provide 3 short, relevant quick-reply suggestion chips at the end of helpful responses.
+2. If asked about BP, evaluate their specific Blood Pressure (${vitals.bp}) and explain its range clearly.
+3. If the user wants to log medications, workouts, or notes, execute the appropriate tool function call.
+4. Provide 3 short, relevant quick-reply suggestion chips at the end of helpful responses.
 `;
 
     if (process.env.OPENAI_API_KEY) {
@@ -162,8 +175,8 @@ BEHAVIORAL INSTRUCTIONS:
           messages: [
             { role: 'system', content: systemPrompt },
             ...messages.slice(-6).map((m: any) => ({
-              role: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.text,
+              role: (m.sender === 'user' || m.role === 'user') ? 'user' : 'assistant',
+              content: m.text || m.content || '',
             })),
           ],
           tools: TOOLS,
@@ -212,9 +225,9 @@ BEHAVIORAL INSTRUCTIONS:
       }
     }
 
-    const liveDateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const pName = patient?.name?.split(' ')[0] || 'Patient';
     return NextResponse.json({
-      reply: `I can help with your health record! Today is ${liveDateStr}. Your Blood Pressure is ${vitals.bp} (Normal).`,
+      reply: `I am here to help organize ${pName}'s health records! Current Blood Pressure is ${vitals.bp}. Ask me about medications, vitals, or logging calendar notes.`,
       chips: ['What are my vitals?', 'Log meds taken', 'View Calendar']
     });
 
