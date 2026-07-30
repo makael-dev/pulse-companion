@@ -1595,7 +1595,7 @@ export default function Dashboard() {
                           key={idx}
                           onClick={() => {
                             setSelectedDateIndex(idx);
-                            setDayModalLog(log); // 👈 Opens summary popup for clicked date
+                            setDayModalLog(log);
                           }}
                           className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center relative ${
                             isSelected
@@ -1968,6 +1968,7 @@ export default function Dashboard() {
         calendarLogs={calendarLogs}
         selectedDateLabel={activeDayLog.dateStr}
         enableRPGSystem={enableRPGSystem}
+        activeTab={activeTab}
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
         onLogWorkoutToCalendar={(exercise, details, targetDateStr) => handleLogWorkoutToCalendar(exercise, details, targetDateStr)}
         onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
