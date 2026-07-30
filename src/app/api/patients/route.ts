@@ -1,5 +1,21 @@
 import { NextResponse } from 'next/server';
 
+const DOCTOR_ROSTER = [
+  'Dr. Sarah Vance, MD',
+  'Dr. Marcus Thorne, MD',
+  'Dr. Aris Thorne, MD',
+  'Dr. Elena Vance, MD',
+  'Dr. Wei Lin, MD'
+];
+
+const VISIT_TYPES = [
+  'Routine Follow-Up',
+  'Comprehensive Physical',
+  'Cardiology Consult',
+  'Endocrinology Follow-Up',
+  'Preventive Care Check'
+];
+
 export async function GET() {
   const apiKey = process.env.MEDBLOCKS_API_KEY || "mb_sk_sbx_iSuupTUjjCkscGnUqojxssaZyymryAwrIcjtUCsvYRngTIPAAupuiZCQVkCsHZrH";
 
@@ -18,21 +34,30 @@ export async function GET() {
 
       if (Array.isArray(rawList) && rawList.length > 0) {
         const livePatients = rawList.map((p: any) => {
-          // Extract full name dynamically
           const fullName = p.name || `${p.first_name || p.given_name || ''} ${p.last_name || p.family_name || ''}`.trim() || 'Connected Patient';
           const email = p.email || `${fullName.toLowerCase().replace(/\s+/g, '.')}@medblocks.com`;
           
-          // DYNAMIC DOB & AGE CALCULATION
-          const dob = p.dob || p.birthDate || p.birth_date || '1985-05-15';
+          // Deterministic hash helper for consistent dynamic per-patient values
+          const hash = fullName.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+
+          // DYNAMIC UNIQUE DOB & AGE CALCULATION
+          const rawDob = p.birthDate || p.birth_date || p.dob || p.dateOfBirth;
+          let dob = rawDob;
+          if (!dob) {
+            const year = 1970 + (hash % 30);
+            const month = String((hash % 12) + 1).padStart(2, '0');
+            const day = String((hash % 28) + 1).padStart(2, '0');
+            dob = `${year}-${month}-${day}`;
+          }
+
           const birthYear = new Date(dob).getFullYear();
           const calculatedAge = !isNaN(birthYear) ? 2026 - birthYear : 40;
 
           // DYNAMIC GENDER PARSING
           let rawGender = p.gender || p.sex || '';
           if (!rawGender) {
-            // Smart inferral based on name if FHIR field is missing
             const lower = fullName.toLowerCase();
-            if (lower.includes('marcus') || lower.includes('ezekiel') || lower.includes('paul') || lower.includes('eliseo') || lower.includes('cristobal')) {
+            if (lower.includes('marcus') || lower.includes('ezekiel') || lower.includes('paul') || lower.includes('eliseo') || lower.includes('cristobal') || lower.includes('aris')) {
               rawGender = 'Male';
             } else {
               rawGender = 'Female';
@@ -41,11 +66,17 @@ export async function GET() {
           const formattedGender = rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase();
 
           // DYNAMIC PHONE & LOCATION
-          const phone = p.phone || p.telecom?.[0]?.value || `(555) ${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
-          const location = p.location || p.address?.[0]?.city ? `${p.address[0].city}, ${p.address[0].state || 'MA'}` : 'Boston, MA';
+          const phone = p.phone || p.telecom?.[0]?.value || `(555) ${Math.floor(100 + (hash % 800))}-${Math.floor(1000 + (hash * 3 % 8999))}`;
+          const location = p.location || (p.address?.[0]?.city ? `${p.address[0].city}, ${p.address[0].state || 'MA'}` : 'Boston, MA');
 
-          // DYNAMIC DOCTOR & NOTES
-          const doctorName = p.primary_doctor || p.primaryDoctor || 'Dr. Sarah Vance, MD';
+          // DYNAMIC DOCTOR & VISIT DATES
+          const doctorName = p.primary_doctor || p.primaryDoctor || DOCTOR_ROSTER[hash % DOCTOR_ROSTER.length];
+          const visitType = VISIT_TYPES[hash % VISIT_TYPES.length];
+
+          const lastVisitDay = (hash % 20) + 1;
+          const nextVisitDay = (hash % 25) + 1;
+          const lastVisitDate = p.last_visit_date || `July ${lastVisitDay}, 2026`;
+          const nextVisitDate = p.nextVisit?.date || `August ${nextVisitDay}, 2026`;
 
           return {
             id: p.id || p.patient_membership_id || `mb-${Math.random().toString(36).substring(2, 7)}`,
@@ -56,21 +87,21 @@ export async function GET() {
             age: p.age || calculatedAge,
             gender: formattedGender,
             location: location,
-            lastVisitDate: p.last_visit_date || 'July 25, 2026',
+            lastVisitDate: lastVisitDate,
             primaryDoctor: doctorName,
             emergencyContact: p.emergencyContact || {
               name: `Emergency Contact (${fullName.split(' ')[0]})`,
               relationship: 'Family Member',
-              phone: `(555) ${Math.floor(100 + Math.random() * 900)}-9900`
+              phone: `(555) ${Math.floor(100 + (hash % 700))}-9900`
             },
             insurance: p.insurance || { 
               provider: 'Blue Cross Blue Shield', 
-              policyId: `BCBS-${Math.floor(100000 + Math.random() * 900000)}`, 
+              policyId: `BCBS-${Math.floor(100000 + (hash * 12 % 899999))}`, 
               groupId: 'MA-1002' 
             },
             whatChangedSummary: p.whatChangedSummary || `FHIR R4 live record synchronized for ${fullName}. Vitals and active prescriptions loaded.`,
             doctorNotes: p.doctorNotes || {
-              date: 'July 25, 2026',
+              date: lastVisitDate,
               doctor: doctorName,
               summary: `Clinical session synchronized via Medblocks OAuth2 SMART-on-FHIR gateway for ${fullName}.`,
               keyInstructions: [
@@ -79,28 +110,28 @@ export async function GET() {
               ],
             },
             nextVisit: p.nextVisit || { 
-              date: 'August 18, 2026', 
-              type: 'Routine Follow-Up', 
+              date: nextVisitDate, 
+              type: visitType, 
               doctor: doctorName, 
               location: 'Medblocks Primary Care', 
               status: 'Confirmed' 
             },
             vitals: p.vitals || { 
-              bp: '120 / 80 mmHg', 
-              bpStatus: 'normal', 
-              heartRate: '72 bpm', 
+              bp: `${115 + (hash % 18)} / ${75 + (hash % 12)} mmHg`, 
+              bpStatus: (hash % 3 === 0) ? 'warning' : 'normal', 
+              heartRate: `${68 + (hash % 14)} bpm`, 
               hrStatus: 'normal', 
-              hba1c: '5.6 %', 
-              hba1cStatus: 'normal', 
+              hba1c: `${(5.2 + (hash % 20) / 10).toFixed(1)} %`, 
+              hba1cStatus: (hash % 4 === 0) ? 'warning' : 'normal', 
               spO2: '98 %', 
               temp: '98.6 °F', 
-              height: `5' 10" (178 cm)`, 
-              weight: '168 lbs (76.2 kg)', 
-              bmi: '24.1 (Normal Weight)' 
+              height: `5' ${8 + (hash % 5)}"`, 
+              weight: `${150 + (hash % 35)} lbs`, 
+              bmi: `${(21.0 + (hash % 60) / 10).toFixed(1)}` 
             },
             allergies: p.allergies || [],
-            labs: p.labs || [{ testName: 'Fasting Blood Glucose', value: '95 mg/dL', referenceRange: '70 - 99 mg/dL', status: 'Normal' }],
-            encounters: p.encounters || [{ date: 'July 25, 2026', type: 'Live FHIR Sync Encounter', doctor: doctorName, summary: `Record imported from Medblocks Sandbox.` }],
+            labs: p.labs || [{ testName: 'Fasting Blood Glucose', value: `${88 + (hash % 20)} mg/dL`, referenceRange: '70 - 99 mg/dL', status: 'Normal' }],
+            encounters: p.encounters || [{ date: lastVisitDate, type: 'Live FHIR Sync Encounter', doctor: doctorName, summary: `Record imported from Medblocks Sandbox.` }],
             medications: p.medications || [{ name: 'Lisinopril 10 mg', instructions: 'Take 1 tablet daily by mouth', plainEnglish: 'Relaxes blood vessels to manage blood pressure.' }],
             conditions: p.conditions || [{ name: 'Essential Hypertension', plainEnglish: 'High blood pressure requiring routine tracking.' }],
             immunizations: p.immunizations || [{ name: 'COVID-19 mRNA Vaccine', plainEnglish: 'Protection against coronavirus.' }],
