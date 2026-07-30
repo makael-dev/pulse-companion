@@ -162,6 +162,20 @@ export async function POST(req: Request) {
       });
     }
 
+    // --- 📉 CLINICAL EHR VITALS QUERY HANDLER (CHECKED BEFORE STATS) ---
+    if (
+      lower.includes('what are my vitals') ||
+      lower.includes('show my vitals') ||
+      lower.includes('check vitals') ||
+      lower.includes('my vitals')
+    ) {
+      const v = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', spO2: '98%' };
+      return NextResponse.json({
+        reply: `📉 **Your Current EHR Vital Signs:**\n\n• **Blood Pressure:** ${v.bp} (${v.bpStatus === 'normal' ? 'Normal' : '⚠️ Risk Review'})\n• **Resting Heart Rate:** ${v.heartRate}\n• **HbA1c:** ${v.hba1c}\n• **SpO₂:** ${v.spO2 || '98%'}\n• **BMI:** ${v.bmi || '24.1'}`,
+        chips: ['What does my BP mean?', 'What are my stats?', 'Active Medications']
+      });
+    }
+
     // --- 💊 MEDICATION TAKEN LOGGING HANDLER (CHECKED BEFORE WORKOUTS) ---
     if (
       (lower.includes('took') || lower.includes('take') || lower.includes('mark') || lower.includes('log')) &&
@@ -186,8 +200,8 @@ export async function POST(req: Request) {
       lower.includes('strength') ||
       lower.includes('endurance') ||
       lower.includes('end') ||
-      lower.includes('vitality') ||
-      lower.includes('vit') ||
+      lower.includes('vitality stat') ||
+      lower.includes('my vit stat') ||
       lower.includes('recovery') ||
       lower.includes('rec') ||
       lower.includes('job') ||
@@ -196,70 +210,70 @@ export async function POST(req: Request) {
     ) {
       if (isStatFollowUp || lower.includes('what does that mean') || lower.includes('explain stats')) {
         return NextResponse.json({
-          reply: `💡 **Here is what your stats mean in simple terms:**\n\nYour stats convert real health & fitness tracking into a **Character Score Sheet**:\n\n• ⚡ **END (Endurance - 93):** Based on hitting your daily 8,000 steps and a 7:45 1-mile run time. High score = strong cardiovascular stamina!\n• 🔥 **REC (Recovery - 88):** Based on averaging 7.0+ hours of sleep per night. High score = good cellular repair & low fatigue.\n• ❤️ **VIT (Vitality - 82):** Based on a healthy 68 bpm resting heart rate & optimal blood pressure. High score = strong heart health.\n• 🏋️‍♂️ **STR (Strength - 71):** Based on your 285 lb Deadlift record. High score = solid physical lifting power.`,
+          reply: `💡 **Here is what your stats mean in simple terms:**\n\nYour stats convert real health & fitness tracking into a **Character Score Sheet**:\n\n• ⚡ **END (Endurance):** Based on hitting daily step goals and run times.\n• 🔥 **REC (Recovery):** Based on quality sleep averages.\n• ❤️ **VIT (Vitality):** Based on resting heart rate & blood pressure efficiency.\n• 🏋️‍♂️ **STR (Strength):** Based on compound lift PR records (Deadlift & Bench Press).`,
           chips: ['How to increase stats', 'Benefits of Stats', 'Job System Info']
         });
       }
 
       if (lower.includes('end is') || lower.includes('endurance is') || lower.includes('my end')) {
         return NextResponse.json({
-          reply: `⚡ **What High Endurance (END 93) Means:**\n\nHaving an **END score of 93** means your cardiovascular stamina and daily activity levels are top-tier!\n\n• **Daily Steps:** You are consistently hitting **7,420 / 8,000 steps** (92%+ of your daily goal).\n• **Cardio Pace:** Your 1-Mile Run time (**7:45**) places you in the **Endurance Peak** range for males in your age bracket (42y).\n• **Real-World Benefit:** Superior VO2 max, higher daily energy, and reduced risk of physical fatigue.`,
+          reply: `⚡ **What High Endurance (END) Means:**\n\nYour **END score** indicates top-tier cardiovascular stamina and daily movement!\n\n• **Daily Steps:** Hitting 7,420 / 8,000 steps (92%+ of goal).\n• **Cardio Pace:** 1-Mile Run time of 7:45 in the peak demographic range.\n• **Real-World Benefit:** Superior VO2 max and daily stamina.`,
           chips: ['What is my best stat?', 'How to increase stats', 'Benefits of Stats']
         });
       }
 
       if (lower.includes('str is') || lower.includes('strength is') || lower.includes('my str')) {
         return NextResponse.json({
-          reply: `🏋️‍♂️ **What Your Strength (STR 71) Means:**\n\nYour **STR score of 71** reflects solid muscle power and compound lifting performance!\n\n• **Lift Baseline:** Based on your **285 lb Deadlift** and **225 lb Bench Press** records.\n• **Real-World Benefit:** Protects joint stability, preserves bone density, and enhances physical power.`,
+          reply: `🏋️‍♂️ **What Your Strength (STR) Means:**\n\nYour **STR score** represents high-tier muscular powerlifting output!\n\n• **Lifting PRs:** Driven by heavy Deadlift and Bench Press records.\n• **Real-World Benefit:** Peak strength, joint stability, and bone density preservation.`,
           chips: ['How to increase stats', 'Benefits of Stats', 'What are my stats?']
         });
       }
 
-      if (lower.includes('vit is') || lower.includes('vitality is') || lower.includes('my vit')) {
+      if (lower.includes('vit stat') || lower.includes('vitality stat') || lower.includes('my vit stat')) {
         return NextResponse.json({
-          reply: `❤️ **What Your Vitality (VIT 82) Means:**\n\nYour **VIT score of 82** measures overall circulatory health and heart efficiency!\n\n• **Resting Heart Rate:** Strong **68 bpm** resting pulse.\n• **Blood Pressure:** Stable BP metrics keeping arterial strain low.\n• **Real-World Benefit:** Lower cardiovascular risk and improved longevity.`,
+          reply: `❤️ **What Your Vitality (VIT) Means:**\n\nYour **VIT score** measures overall circulatory health and heart efficiency!\n\n• **Resting Heart Rate:** Healthy resting pulse.\n• **Blood Pressure:** Stable BP metrics keeping arterial strain low.\n• **Real-World Benefit:** Lower cardiovascular risk and improved longevity.`,
           chips: ['Check Vitals', 'How to increase stats', 'Benefits of Stats']
         });
       }
 
       if (lower.includes('rec is') || lower.includes('recovery is') || lower.includes('my rec')) {
         return NextResponse.json({
-          reply: `🔥 **What Your Recovery (REC 88) Means:**\n\nYour **REC score of 88** measures how effectively your body recharges through sleep and stress management!\n\n• **Sleep Average:** Averaging **7.0 - 7.5 hours** of quality sleep on your calendar log.\n• **Stress Index:** Keeping stress scores controlled (average 4/10).\n• **Real-World Benefit:** Fast muscle repair, balanced hormones, and strong immune defense.`,
+          reply: `🔥 **What Your Recovery (REC) Means:**\n\nYour **REC score** measures how effectively your body recharges through sleep and stress management!\n\n• **Sleep Average:** Quality sleep on your calendar log.\n• **Stress Index:** Low daily stress scores.\n• **Real-World Benefit:** Fast muscle repair, balanced hormones, and immune defense.`,
           chips: ['How to increase stats', 'Benefits of Stats', 'View Calendar']
         });
       }
 
       if (lower.includes('best') || lower.includes('highest') || lower.includes('top stat')) {
         return NextResponse.json({
-          reply: `⚡ **Your Highest Stat is Endurance (END 93)!**\n\n• **END (93):** Excellent step count tracking (7,420 / 8k steps) & cardiovascular conditioning!\n• **REC (88):** Strong sleep average (7.0h avg).\n• **VIT (82):** Healthy resting heart rate (68 bpm).\n• **STR (71):** Deadlift PR at 285 lbs.\n\n*Overall Level: LVL 84 Warrior*`,
-          chips: ['What does that mean?', 'How to increase stats', 'Benefits of Stats']
+          reply: `🏋️‍♂️ **Your Highest Stat is Strength (STR)!**\n\n• **STR:** Elite compound lifting PRs!\n• **END:** High daily step tracking & cardio times.\n• **VIT:** Healthy resting heart rate.\n• **REC:** Solid sleep recovery average.`,
+          chips: ['How to increase stats', 'Benefits of Stats', 'Job System Info']
         });
       }
 
-      if (lower.includes('what are my') || lower.includes('my stats') || lower.includes('show stats') || lower.includes('summary')) {
+      if (lower.includes('what are my stats') || lower.includes('my stats') || lower.includes('show stats')) {
         return NextResponse.json({
-          reply: `🎮 **Current Character Stats Overview (LVL 84):**\n\n• ⚡ **END (Endurance): 93** — Steps: 7,420 / 8k Goal\n• 🔥 **REC (Recovery): 88** — Avg Sleep: 7.0 hrs\n• ❤️ **VIT (Vitality): 82** — Resting HR: 68 bpm\n• 🏋️‍♂️ **STR (Strength): 71** — Deadlift: 285 lbs\n\n*Active Perk: "Inner Release" (+15% Strength XP gain on heavy lifts)*`,
-          chips: ['What does that mean?', 'What is my best stat?', 'How to increase stats']
+          reply: `🎮 **Current Character Stats Overview:**\n\n• 🏋️‍♂️ **STR (Strength):** High powerlifting PRs\n• ⚡ **END (Endurance):** Daily steps & mile run pace\n• ❤️ **VIT (Vitality):** Healthy heart rate & BP\n• 🔥 **REC (Recovery):** Sleep & stress management\n\n*Active Job Ability active!*`,
+          chips: ['What is my best stat?', 'How to increase stats', 'Benefits of Stats']
         });
       }
 
       if (lower.includes('increase') || lower.includes('level up') || lower.includes('raise') || lower.includes('boost')) {
         return NextResponse.json({
-          reply: `🎮 **How to Increase Your Stats:**\n\n• 🏋️‍♂️ **STR (Strength):** Log heavy compound lifts (Deadlifts, Squats, Bench Press). Each PR boosts your Strength Level!\n• ⚡ **END (Endurance):** Complete daily step targets (8,000+ steps) or cardio runs (1 Mile, 5K).\n• ❤️ **VIT (Vitality):** Maintain healthy Blood Pressure & low resting heart rate (sub-70 bpm).\n• 🌿 **REC (Recovery):** Log 7.5+ hours of sleep & keep daily stress scores low.\n\n*Tip: Switch your Fitness Job in the Activity tab to get active XP buffs for your focus stat!*`,
+          reply: `🎮 **How to Increase Your Stats:**\n\n• 🏋️‍♂️ **STR:** Log heavy compound lift PRs (Deadlift, Bench Press).\n• ⚡ **END:** Hit daily step targets (8,000+ steps) or improve run times.\n• ❤️ **VIT:** Maintain optimal blood pressure & resting HR.\n• 🌿 **REC:** Log 7.5+ hours of sleep & maintain low stress.`,
           chips: ['Benefits of Stats', 'What are Jobs?', 'My Vitals']
         });
       }
 
       if (lower.includes('benefit') || lower.includes('real world') || lower.includes('why care')) {
         return NextResponse.json({
-          reply: `💡 **Real-World Health Benefits of Your Stats:**\n\n• **Strength (STR):** Builds bone density, preserves muscle mass as you age, and protects lower back health.\n• **Endurance (END):** Boosts VO2 max, increases daily energy levels, and lowers risk of cardiovascular fatigue.\n• **Vitality (VIT):** Reflects a strong heart and clean arterial flow, reducing risk of stroke and hypertension.\n• **Recovery (REC):** Essential for immune function, mental clarity, hormone balance, and cell repair.`,
+          reply: `💡 **Real-World Health Benefits of Your Stats:**\n\n• **Strength (STR):** Builds bone density and protects lower back health.\n• **Endurance (END):** Boosts VO2 max and daily stamina.\n• **Vitality (VIT):** Promotes a healthy heart and vascular system.\n• **Recovery (REC):** Crucial for immune function and cellular repair.`,
           chips: ['How to increase stats', 'Job System Info', 'Check Vitals']
         });
       }
 
       if (lower.includes('job') || lower.includes('class') || lower.includes('warrior') || lower.includes('bard')) {
         return NextResponse.json({
-          reply: `🛡️ **Fitness Job Roles Overview:**\n\n• 🪓 **Warrior (WAR):** Tank role focusing on **STR** (*Inner Release perk gives +15% XP on Heavy Lifts*).\n• 🛡️ **Paladin (PLD):** Tank role focusing on **VIT** (*Hallowed Ground perk gives +10% XP for stable BP*).\n• 🏹 **Bard (BRD):** Physical Ranged focusing on **END** (*Peloton Pace perk gives +15% XP on Step Goals*).\n• 🪄 **White Mage (WHM):** Healer role focusing on **REC** (*Curaja perk gives +15% XP on 7.5h+ Sleep*).\n• 🥊 **Monk (MNK):** Melee DPS for high-tempo rep workouts.\n• 🔮 **Black Mage (BLM):** Caster focusing on low-stress mental focus.`,
+          reply: `🛡️ **Fitness Job Roles Overview:**\n\n• 🪓 **Warrior (WAR):** Focuses on **STR** (*Inner Release perk*).\n• 🛡️ **Paladin (PLD):** Focuses on **VIT** (*Hallowed Ground perk*).\n• 🏹 **Bard (BRD):** Focuses on **END** (*Peloton Pace perk*).\n• 🪄 **White Mage (WHM):** Focuses on **REC** (*Curaja Recovery perk*).\n• 🥊 **Monk (MNK):** High-tempo rep workouts.\n• 🔮 **Black Mage (BLM):** Stress management & mental focus.`,
           chips: ['How to level up', 'Benefits of Stats', 'Activity Tab']
         });
       }
@@ -312,7 +326,7 @@ export async function POST(req: Request) {
     ) {
       const doctor = patient?.primaryDoctor || 'Dr. Sarah Vance, MD';
       return NextResponse.json({
-        reply: `🩺 **If you are feeling sick or unwell:**\n\n1. **Severe Symptoms:** If experiencing chest pain, difficulty breathing, or severe dizziness, call **911** or go to Urgent Care immediately.\n2. **Routine Illness:** Contact ${doctor}'s office at **${patient?.phone || '(555) 234-5678'}** or send a message through your portal.\n3. **Log Symptoms:** You can type your symptoms right here to record them on your calendar for your doctor review!`,
+        reply: `🩺 **If you are feeling sick or unwell:**\n\n1. **Severe Symptoms:** Call **911** or visit urgent care for emergency symptoms.\n2. **Routine Illness:** Contact ${doctor}'s office at **${patient?.phone || '(555) 234-5678'}**.\n3. **Log Symptoms:** Record symptoms here to prepare for your next visit!`,
         chips: ['Log a symptom', 'Emergency ID', 'Active Meds']
       });
     }
@@ -328,8 +342,8 @@ export async function POST(req: Request) {
       lower.includes('how are you')
     ) {
       return NextResponse.json({
-        reply: "Hello! 👋 I'm your Pulse Companion AI. I can help organize your health records, answer questions about your fitness stats & jobs, check your vitals, or log workouts and symptoms!",
-        chips: ['What are my stats?', 'What is my best stat?', 'How do I increase stats?', 'What are my vitals?']
+        reply: "Hello! 👋 I'm your Pulse Companion AI. Ask me about your health records, vitals, stats, or log workouts and notes!",
+        chips: ['What are my vitals?', 'What are my stats?', 'How do I increase stats?', 'When is my next visit?']
       });
     }
 
@@ -339,7 +353,7 @@ export async function POST(req: Request) {
       const notesSummary = activeLog?.notes ? `Notes for ${selectedDateLabel}: "${activeLog.notes}"` : `No context notes recorded for ${selectedDateLabel} yet.`;
 
       return NextResponse.json({
-        reply: `📅 **28-Day Calendar Overview:**\n\n• Currently viewing **${selectedDateLabel}**.\n• ${notesSummary}\n\nYou can click any date on the main calendar grid to view or edit sleep hours, medication logs, and notes!`,
+        reply: `📅 **28-Day Calendar Overview:**\n\n• Currently viewing **${selectedDateLabel}**.\n• ${notesSummary}\n\nClick any date on the calendar grid to switch dates!`,
         chips: [`Mark taken for ${selectedDateLabel}`, 'Check Vitals', 'Active Meds']
       });
     }
@@ -469,7 +483,7 @@ Be conversational, warm, and helpful. Use functions when appropriate.`;
         if (choice?.content) {
           return NextResponse.json({
             reply: choice.content,
-            chips: ['What are my stats?', 'How to increase stats', 'What are my vitals?']
+            chips: ['What are my vitals?', 'What are my stats?', 'How to increase stats']
           });
         }
       }
@@ -499,15 +513,15 @@ Be conversational, warm, and helpful. Use functions when appropriate.`;
     }
 
     return NextResponse.json({
-      reply: "Hi there! 👋 I'm your Pulse Companion AI. Ask me what your stats are, how to level up, or log notes for your calendar!",
-      chips: ['What are my stats?', 'What is my best stat?', 'How to increase stats', 'Benefits of stats']
+      reply: "Hi there! 👋 I'm your Pulse Companion AI. Ask me about your vitals, stats, or log notes for your calendar!",
+      chips: ['What are my vitals?', 'What are my stats?', 'How to increase stats', 'Benefits of stats']
     });
 
   } catch (err) {
     console.error('Chat API Error:', err);
     return NextResponse.json({
       reply: "I am here to help organize your health records! Ask me about your medications, doctor visits, stats, or log notes.",
-      chips: ['What are my stats?', 'How to increase stats', 'My Vitals']
+      chips: ['What are my vitals?', 'What are my stats?', 'My Vitals']
     });
   }
 }
