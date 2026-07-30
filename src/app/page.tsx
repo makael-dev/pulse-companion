@@ -10,6 +10,7 @@ import PulseChatDrawer from './components/PulseChatDrawer';
 import VitalsChart from './components/VitalsChart';
 import LabGaugeModal from './components/LabGaugeModal';
 import AppointmentPrepTimeline from './components/AppointmentPrepTimeline';
+import WorkoutTracker from './components/WorkoutTracker';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
@@ -67,6 +68,11 @@ type DetailedSymptom = {
   duration: '< 24 hrs' | '2-3 days' | '1+ weeks' | 'Chronic';
 };
 
+type WorkoutEntry = {
+  exercise: string;
+  details: string;
+};
+
 type CalendarDayLog = {
   dateStr: string;
   dayLabel: string;
@@ -80,6 +86,7 @@ type CalendarDayLog = {
   activityLevel?: 'Sedentary' | 'Light' | 'Moderate' | 'Active';
   notes?: string;
   medsTaken?: Record<string, boolean>;
+  workouts?: WorkoutEntry[];
 };
 
 type DoctorNotes = {
@@ -186,6 +193,10 @@ function generateRolling28Days(): CalendarDayLog[] {
         'Lisinopril 10 mg': true,
         'Metformin 500 mg': i !== 2,
       },
+      workouts: i % 3 === 0 ? [
+        { exercise: 'Deadlift', details: '3 sets x 8 reps @ 275 lbs' },
+        { exercise: '1 Mile Run', details: 'Completed in 7:45' },
+      ] : [],
     });
   }
   return days;
@@ -210,7 +221,7 @@ export default function Dashboard() {
     shareDelta: true,
     shareDoctorNotes: true,
     shareSymptomPrep: true,
-    sharePrepTimeline: true, // 👈 Added Checklist to privacy controls
+    sharePrepTimeline: true,
     shareDiagnoses: true,
     shareAllergies: true,
     shareMeds: true,
@@ -505,7 +516,7 @@ export default function Dashboard() {
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              {caregiverMode ? '👨‍👩‍👧 Caregiver View Active' : '👤 Patient View'}
+              {caregiverMode ? '👨‍gsub Caregiver View Active' : '👤 Patient View'}
             </button>
 
             <button
@@ -726,8 +737,8 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border">
                   <div>
-                    <span className="font-bold text-slate-900 block">🏃‍♂️ Apple Health Activity Telemetry</span>
-                    <span className="text-[10px] text-slate-500">Show step counts and exercise telemetry</span>
+                    <span className="font-bold text-slate-900 block">🏃‍♂️ Apple Health Activity & Fitness Telemetry</span>
+                    <span className="text-[10px] text-slate-500">Show step counts, exercise, and personal records</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1509,7 +1520,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 3: DYNAMIC ROLLING 28-DAY CALENDAR WITH INTEGRATED PILL TRACKER */}
+        {/* TAB 3: UNIFIED ROLLING 28-DAY CALENDAR (SLEEP, MEDS, WORKOUTS & REPS) */}
         {activeTab === 'wellness' && (
           <section aria-label="Sleep & Daily Calendar Tracking" className="space-y-4">
             {consentPermissions.shareMentalHealth ? (
@@ -1529,6 +1540,7 @@ export default function Dashboard() {
                       const isSelected = idx === selectedDateIndex;
                       const hasNotes = !!log.notes;
                       const dayMedsCount = Object.values(log.medsTaken || {}).filter(Boolean).length;
+                      const hasWorkouts = log.workouts && log.workouts.length > 0;
 
                       return (
                         <button
@@ -1543,8 +1555,9 @@ export default function Dashboard() {
                           <span className="text-[9px] uppercase font-bold text-slate-400">{log.dayLabel}</span>
                           <span className="text-xs font-bold mt-0.5">{log.dateStr.split(' ')[1]}</span>
                           <div className="flex gap-1 mt-1">
-                            {dayMedsCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>}
-                            {hasNotes && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                            {dayMedsCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Meds Logged"></span>}
+                            {hasWorkouts && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" title="Workout Logged"></span>}
+                            {hasNotes && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Note Logged"></span>}
                           </div>
                         </button>
                       );
@@ -1552,16 +1565,16 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* CALENDAR DATE LOG DETAILS & INTEGRATED PILL TRACKER */}
+                {/* UNIFIED DAILY CALENDAR DETAILS CARD */}
                 <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <h3 className="text-sm font-extrabold text-slate-900">
-                      📝 Logged Entry for: <span className="text-indigo-700">{activeDayLog.dateStr}</span> ({activeDayLog.dayLabel})
+                      📅 Unified Health Record for: <span className="text-indigo-700">{activeDayLog.dateStr}</span> ({activeDayLog.dayLabel})
                     </h3>
                     <span className="text-xs text-slate-500 font-medium">Auto-saves to browser & AI chat</span>
                   </div>
 
-                  {/* PILL TRACKER FOR SELECTED CALENDAR DAY */}
+                  {/* 1. MEDICATION TRACKER FOR SELECTED CALENDAR DAY */}
                   {consentPermissions.shareMeds && patient?.medications && (
                     <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-xl space-y-2.5">
                       <div className="flex items-center justify-between border-b border-indigo-200 pb-1.5">
@@ -1604,114 +1617,147 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-800 block">Daily Mood & Energy:</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(['Good', 'Neutral', 'Anxious', 'Fatigued'] as const).map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => {
+                  {/* 2. SLEEP & MOOD LOG */}
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 block">Daily Mood & Energy:</label>
+                      <div className="flex flex-wrap gap-2">
+                        {(['Good', 'Neutral', 'Anxious', 'Fatigued'] as const).map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              const updated = [...calendarLogs];
+                              updated[selectedDateIndex].mood = m;
+                              setCalendarLogs(updated);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                              activeDayLog.mood === m
+                                ? 'bg-indigo-700 text-white border-indigo-700'
+                                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                            }`}
+                          >
+                            {m === 'Good' && '😊 Rested'}
+                            {m === 'Neutral' && '😐 Neutral'}
+                            {m === 'Anxious' && '😰 Anxious'}
+                            {m === 'Fatigued' && '😴 Fatigued'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-800 block mb-1">Bedtime:</label>
+                        <input
+                          type="text"
+                          value={activeDayLog.bedtime || '11:00 PM'}
+                          onChange={(e) => {
                             const updated = [...calendarLogs];
-                            updated[selectedDateIndex].mood = m;
+                            updated[selectedDateIndex].bedtime = e.target.value;
                             setCalendarLogs(updated);
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
-                            activeDayLog.mood === m
-                              ? 'bg-indigo-700 text-white border-indigo-700'
-                              : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                          }`}
+                          className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-800 block mb-1">Wake Time:</label>
+                        <input
+                          type="text"
+                          value={activeDayLog.wakeTime || '06:30 AM'}
+                          onChange={(e) => {
+                            const updated = [...calendarLogs];
+                            updated[selectedDateIndex].wakeTime = e.target.value;
+                            setCalendarLogs(updated);
+                          }}
+                          className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-800 block mb-1">Caffeine Intake:</label>
+                        <select
+                          value={activeDayLog.caffeineIntake || '1-2 Cups ☕'}
+                          onChange={(e) => {
+                            const updated = [...calendarLogs];
+                            updated[selectedDateIndex].caffeineIntake = e.target.value as any;
+                            setCalendarLogs(updated);
+                          }}
+                          className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
                         >
-                          {m === 'Good' && '😊 Rested'}
-                          {m === 'Neutral' && '😐 Neutral'}
-                          {m === 'Anxious' && '😰 Anxious'}
-                          {m === 'Fatigued' && '😴 Fatigued'}
-                        </button>
-                      ))}
+                          <option value="None ☕">None ☕</option>
+                          <option value="1-2 Cups ☕">1-2 Cups ☕</option>
+                          <option value="3+ Cups ☕">3+ Cups ☕</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 block mb-1">Hours Slept: {activeDayLog.sleepHours} hrs</label>
+                        <input
+                          type="range"
+                          min="3"
+                          max="12"
+                          step="0.5"
+                          value={activeDayLog.sleepHours}
+                          onChange={(e) => {
+                            const updated = [...calendarLogs];
+                            updated[selectedDateIndex].sleepHours = parseFloat(e.target.value);
+                            setCalendarLogs(updated);
+                          }}
+                          className="w-full accent-indigo-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 block mb-1">Stress Level: {activeDayLog.stressLevel}/10</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={activeDayLog.stressLevel}
+                          onChange={(e) => {
+                            const updated = [...calendarLogs];
+                            updated[selectedDateIndex].stressLevel = parseInt(e.target.value);
+                            setCalendarLogs(updated);
+                          }}
+                          className="w-full accent-indigo-600"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
-                    <div>
-                      <label className="font-bold text-slate-800 block mb-1">Bedtime:</label>
-                      <input
-                        type="text"
-                        value={activeDayLog.bedtime || '11:00 PM'}
-                        onChange={(e) => {
-                          const updated = [...calendarLogs];
-                          updated[selectedDateIndex].bedtime = e.target.value;
-                          setCalendarLogs(updated);
-                        }}
-                        className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                      />
+                  {/* 3. WORKOUT & REPS LOG FOR SELECTED CALENDAR DAY */}
+                  <div className="bg-purple-50/70 border border-purple-200 p-4 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-purple-200 pb-1.5">
+                      <span className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                        🏋️ Workout & Reps Log for {activeDayLog.dateStr}
+                      </span>
+                      <span className="text-[11px] font-bold text-purple-900 bg-purple-200 px-2 py-0.5 rounded">
+                        {activeDayLog.workouts?.length || 0} Sessions Logged
+                      </span>
                     </div>
 
-                    <div>
-                      <label className="font-bold text-slate-800 block mb-1">Wake Time:</label>
-                      <input
-                        type="text"
-                        value={activeDayLog.wakeTime || '06:30 AM'}
-                        onChange={(e) => {
-                          const updated = [...calendarLogs];
-                          updated[selectedDateIndex].wakeTime = e.target.value;
-                          setCalendarLogs(updated);
-                        }}
-                        className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-slate-800 block mb-1">Caffeine Intake:</label>
-                      <select
-                        value={activeDayLog.caffeineIntake || '1-2 Cups ☕'}
-                        onChange={(e) => {
-                          const updated = [...calendarLogs];
-                          updated[selectedDateIndex].caffeineIntake = e.target.value as any;
-                          setCalendarLogs(updated);
-                        }}
-                        className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                      >
-                        <option value="None ☕">None ☕</option>
-                        <option value="1-2 Cups ☕">1-2 Cups ☕</option>
-                        <option value="3+ Cups ☕">3+ Cups ☕</option>
-                      </select>
-                    </div>
+                    {activeDayLog.workouts && activeDayLog.workouts.length > 0 ? (
+                      <div className="space-y-1.5 pt-1">
+                        {activeDayLog.workouts.map((w, idx) => (
+                          <div key={idx} className="p-2.5 bg-white rounded-lg border border-purple-200 text-xs flex justify-between items-center shadow-sm">
+                            <span className="font-bold text-slate-900">• {w.exercise}</span>
+                            <span className="text-purple-900 font-semibold bg-purple-100 px-2 py-0.5 rounded text-[11px]">
+                              {w.details}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white/80 rounded-lg text-center text-xs text-slate-500 italic border border-purple-100">
+                        No specific workout reps logged for {activeDayLog.dateStr} yet. Track new personal bests in the Activity tab or ask AI chat!
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 block mb-1">Hours Slept: {activeDayLog.sleepHours} hrs</label>
-                      <input
-                        type="range"
-                        min="3"
-                        max="12"
-                        step="0.5"
-                        value={activeDayLog.sleepHours}
-                        onChange={(e) => {
-                          const updated = [...calendarLogs];
-                          updated[selectedDateIndex].sleepHours = parseFloat(e.target.value);
-                          setCalendarLogs(updated);
-                        }}
-                        className="w-full accent-indigo-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 block mb-1">Stress Level: {activeDayLog.stressLevel}/10</label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        value={activeDayLog.stressLevel}
-                        onChange={(e) => {
-                          const updated = [...calendarLogs];
-                          updated[selectedDateIndex].stressLevel = parseInt(e.target.value);
-                          setCalendarLogs(updated);
-                        }}
-                        className="w-full accent-indigo-600"
-                      />
-                    </div>
-                  </div>
-
+                  {/* 4. DAILY NOTES */}
                   <div className="space-y-1.5">
                     <label htmlFor="date-note-input" className="text-xs font-bold text-slate-800 block">
                       ✏️ Daily Context Notes for {activeDayLog.dateStr}:
@@ -1743,74 +1789,80 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* TAB 4 */}
+        {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH WORKOUT TRACKER */}
         {activeTab === 'fitness' && (
           <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
             {consentPermissions.shareFitness ? (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2 tracking-wide uppercase">
-                      🏃‍♂️ Apple Health Telemetry & Daily Activity
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Real-time metric syncing to monitor patient compliance with physician walking instructions.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Apple Health Connected
-                  </span>
-                </div>
+              <div className="space-y-4">
+                {/* 🏋️ Personal Workout Tracker & Demographic Benchmarks */}
+                <WorkoutTracker patient={patient} />
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Steps</span>
-                      <span className="text-[10px] text-emerald-400 font-semibold">92% of Goal</span>
+                {/* 🏃‍♂️ Apple Health Sync Overview */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2 tracking-wide uppercase">
+                        🏃‍♂️ Apple Health Telemetry & Daily Activity
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Real-time metric syncing to monitor patient compliance with physician walking instructions.
+                      </p>
                     </div>
-                    <div className="text-2xl font-bold text-indigo-400 mt-2">
-                      7,420 <span className="text-xs text-slate-400 font-normal">/ 8,000</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: '92%' }}></div>
-                    </div>
+                    <span className="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Apple Health Connected
+                    </span>
                   </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Exercise</span>
-                      <span className="text-[10px] text-emerald-400 font-semibold">Goal Met (30m)</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                      <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Steps</span>
+                        <span className="text-[10px] text-emerald-400 font-semibold">92% of Goal</span>
+                      </div>
+                      <div className="text-2xl font-bold text-indigo-400 mt-2">
+                        7,420 <span className="text-xs text-slate-400 font-normal">/ 8,000</span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-indigo-500 h-full rounded-full" style={{ width: '92%' }}></div>
+                      </div>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-400 mt-2">
-                      32 <span className="text-xs text-slate-400 font-normal">mins</span>
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                      <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Exercise</span>
+                        <span className="text-[10px] text-emerald-400 font-semibold">Goal Met (30m)</span>
+                      </div>
+                      <div className="text-2xl font-bold text-emerald-400 mt-2">
+                        32 <span className="text-xs text-slate-400 font-normal">mins</span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: '100%' }}></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: '100%' }}></div>
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                      <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resting Heart Rate</span>
+                        <span className="text-[10px] text-slate-400">Normal Range</span>
+                      </div>
+                      <div className="text-2xl font-bold text-rose-400 mt-2">
+                        68 <span className="text-xs font-normal text-slate-400">bpm</span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-3">
+                        Weekly Average: <strong className="text-slate-200">67 bpm</strong>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resting Heart Rate</span>
-                      <span className="text-[10px] text-slate-400">Normal Range</span>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
+                    <span className="text-base">💡</span>
+                    <div className="text-xs text-slate-300 space-y-1">
+                      <strong className="text-white block font-semibold">AI Clinical Telemetry Summary:</strong>
+                      <p>
+                        Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery since starting the current Lisinopril regimen.
+                      </p>
                     </div>
-                    <div className="text-2xl font-bold text-rose-400 mt-2">
-                      68 <span className="text-xs font-normal text-slate-400">bpm</span>
-                    </div>
-                    <div className="text-xs text-slate-400 mt-3">
-                      Weekly Average: <strong className="text-slate-200">67 bpm</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
-                  <span className="text-base">💡</span>
-                  <div className="text-xs text-slate-300 space-y-1">
-                    <strong className="text-white block font-semibold">AI Clinical Telemetry Summary:</strong>
-                    <p>
-                      Ezekiel has met his daily 30-minute walking goal 5 out of the last 7 days. Resting heart rate trends show a 4% improvement in cardiovascular recovery since starting the current Lisinopril regimen.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -1819,7 +1871,7 @@ export default function Dashboard() {
                 <span className="text-3xl">🔒</span>
                 <h3 className="text-sm font-bold text-slate-900">Activity Telemetry Module Redacted</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Apple Health step and heart rate telemetry has been set to private via Patient Privacy Controls.
+                  Apple Health step and exercise telemetry has been set to private via Patient Privacy Controls.
                 </p>
               </div>
             )}
