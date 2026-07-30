@@ -219,7 +219,9 @@ export default function Dashboard() {
   const [showEHRModal, setShowEHRModal] = useState(false);
   const [linkStep, setLinkStep] = useState<'select' | 'auth' | 'sync'>('select');
   const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
-  const [connectedPortal, setConnectedPortal] = useState<string | null>('Synthetic Hospital (Medblocks FHIR R4)');
+  
+  // STARTS DISCONNECTED (NULL) ON PAGE RELOAD
+  const [connectedPortal, setConnectedPortal] = useState<string | null>(null);
 
   const handleDisconnectEHR = () => {
     setConnectedPortal(null);
@@ -431,6 +433,7 @@ export default function Dashboard() {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // FETCH PATIENTS FROM API WITHOUT AUTO-SELECTING (KEEPS BLANK ON RELOAD)
   useEffect(() => {
     async function loadPatients() {
       try {
@@ -438,10 +441,6 @@ export default function Dashboard() {
         const data = await res.json();
         const list: PatientProfile[] = data.data || [];
         setPatients(list);
-        if (list.length > 0) {
-          setSelectedPatientId(list[0].id);
-          setPatient(list[0]);
-        }
       } catch (err) {
         console.error('Failed to load patient records:', err);
       }
@@ -576,7 +575,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => setShowConsentModal(true)}
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1"
+              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1 cursor-pointer"
             >
               🔒 Privacy Controls
             </button>
@@ -584,7 +583,7 @@ export default function Dashboard() {
             <button
               onClick={() => setCaregiverMode(!caregiverMode)}
               aria-label={caregiverMode ? 'Switch to Patient View Mode' : 'Switch to Caregiver View Mode'}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition border cursor-pointer ${
                 caregiverMode
                   ? 'bg-amber-100 text-amber-950 border-amber-300'
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
@@ -596,7 +595,7 @@ export default function Dashboard() {
             <button
               onClick={() => setShowEmergencyModal(true)}
               aria-label="Open Emergency Health ID Card"
-              className="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1"
+              className="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1 cursor-pointer"
             >
               <span aria-hidden="true">🚨</span> Emergency ID
             </button>
@@ -613,7 +612,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
               <button
                 onClick={() => setShowConsentModal(false)}
-                className="absolute top-4 right-4 text-slate-600 hover:text-slate-900 font-bold text-base p-1"
+                className="absolute top-4 right-4 text-slate-600 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -665,14 +664,14 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => toggleAllPrivacyPermissions(true)}
-                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition"
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
                   >
                     👁️ Show All
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleAllPrivacyPermissions(false)}
-                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg transition"
+                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
                   >
                     🔒 Hide All
                   </button>
@@ -813,7 +812,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setShowConsentModal(false)}
-                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow mt-2"
+                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow mt-2 cursor-pointer font-sans"
               >
                 Save Consent Preferences
               </button>
@@ -833,7 +832,7 @@ export default function Dashboard() {
               <button
                 onClick={() => setShowEmergencyModal(false)}
                 aria-label="Close Emergency ID Modal"
-                className="absolute top-4 right-4 text-slate-600 hover:text-slate-900 font-bold text-base p-1"
+                className="absolute top-4 right-4 text-slate-600 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -922,7 +921,7 @@ export default function Dashboard() {
               <button
                 onClick={() => handlePrintCard()}
                 aria-label="Print Emergency Wallet Card"
-                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow"
+                className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-slate-800 transition shadow cursor-pointer font-sans"
               >
                 🖨️ Print Emergency Wallet Card
               </button>
@@ -930,7 +929,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* DISCONNECTED EMPTY STATE CARD */}
+        {/* DISCONNECTED EMPTY STATE CARD (DEFAULT ON LOAD) */}
         {!patient ? (
           <div className="bg-white p-12 text-center rounded-2xl border border-slate-300 shadow-sm space-y-4 my-8">
             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-3xl mx-auto font-bold">
@@ -944,7 +943,7 @@ export default function Dashboard() {
             </div>
             <button
               onClick={() => setShowEHRModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-full text-xs shadow-md transition cursor-pointer"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-full text-xs shadow-md transition cursor-pointer font-sans"
             >
               🔗 Connect Health Records via Medblocks
             </button>
@@ -957,7 +956,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab('vitals')}
                 aria-selected={activeTab === 'vitals'}
                 role="tab"
-                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
+                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full cursor-pointer ${
                   activeTab === 'vitals'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -969,7 +968,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab('symptoms')}
                 aria-selected={activeTab === 'symptoms'}
                 role="tab"
-                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
+                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full cursor-pointer ${
                   activeTab === 'symptoms'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -981,7 +980,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab('wellness')}
                 aria-selected={activeTab === 'wellness'}
                 role="tab"
-                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
+                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full cursor-pointer ${
                   activeTab === 'wellness'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -993,7 +992,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab('fitness')}
                 aria-selected={activeTab === 'fitness'}
                 role="tab"
-                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full ${
+                className={`py-3 px-4 text-xs font-extrabold transition-all rounded-xl flex items-center justify-center gap-2 w-full cursor-pointer ${
                   activeTab === 'fitness'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -1054,7 +1053,7 @@ export default function Dashboard() {
                           handleAddSymptom(undefined, `Elevated Vitals Review: Blood Pressure (${patient.vitals.bp}), HbA1c (${patient.vitals.hba1c})`);
                           setActiveTab('symptoms');
                         }}
-                        className="bg-amber-900 hover:bg-amber-950 text-white font-bold px-3 py-1.5 rounded-lg transition text-[11px] shadow-sm font-sans"
+                        className="bg-amber-900 hover:bg-amber-950 text-white font-bold px-3 py-1.5 rounded-lg transition text-[11px] shadow-sm font-sans cursor-pointer"
                       >
                         + Add Risk Flag to Doctor Visit Agenda
                       </button>
@@ -1340,7 +1339,7 @@ export default function Dashboard() {
                           onClick={() => setShowLabs(!showLabs)}
                           aria-expanded={showLabs}
                           aria-controls="labs-accordion-content"
-                          className="w-full p-3.5 text-xs font-extrabold text-slate-800 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition"
+                          className="w-full p-3.5 text-xs font-extrabold text-slate-800 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
                         >
                           <span>🧪 Recent Lab Panels ({patient.labs?.length || 0} results - Click Any To View Spectrum Gauge)</span>
                           <span aria-hidden="true">{showLabs ? '▲ Hide' : '▼ Expand'}</span>
@@ -1387,7 +1386,7 @@ export default function Dashboard() {
                           onClick={() => setShowEncounters(!showEncounters)}
                           aria-expanded={showEncounters}
                           aria-controls="encounters-accordion-content"
-                          className="w-full p-3.5 text-xs font-extrabold text-slate-800 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition"
+                          className="w-full p-3.5 text-xs font-extrabold text-slate-800 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
                         >
                           <span>📜 Clinical Encounter History ({patient.encounters?.length || 0} visits)</span>
                           <span aria-hidden="true">{showEncounters ? '▲ Hide' : '▼ Expand'}</span>
@@ -1456,7 +1455,7 @@ export default function Dashboard() {
                             type="button"
                             onClick={() => handleAddSymptom(undefined, chip)}
                             aria-label={`Quick add symptom ${chip}`}
-                            className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-bold px-3 py-1 rounded-full transition"
+                            className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-bold px-3 py-1 rounded-full transition cursor-pointer"
                           >
                             + {chip}
                           </button>
@@ -1485,7 +1484,7 @@ export default function Dashboard() {
                               id="severity-select"
                               value={selectedSeverity}
                               onChange={(e) => setSelectedSeverity(e.target.value as any)}
-                              className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                              className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold cursor-pointer"
                             >
                               <option value="Mild">🟢 Mild</option>
                               <option value="Moderate">🟡 Moderate</option>
@@ -1499,7 +1498,7 @@ export default function Dashboard() {
                               id="duration-select"
                               value={selectedDuration}
                               onChange={(e) => setSelectedDuration(e.target.value as any)}
-                              className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                              className="bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold cursor-pointer"
                             >
                               <option value="< 24 hrs">&lt; 24 hrs</option>
                               <option value="2-3 days">2-3 days</option>
@@ -1511,7 +1510,7 @@ export default function Dashboard() {
 
                         <button
                           type="submit"
-                          className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition"
+                          className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer"
                         >
                           + Add Issue
                         </button>
@@ -1528,7 +1527,7 @@ export default function Dashboard() {
                           <button 
                             onClick={() => handleRemoveSymptom(idx)} 
                             aria-label={`Remove symptom ${symptom.text}`}
-                            className="text-slate-600 hover:text-rose-700 font-bold text-xs p-1"
+                            className="text-slate-600 hover:text-rose-700 font-bold text-xs p-1 cursor-pointer"
                           >
                             ✕ Remove
                           </button>
@@ -1540,7 +1539,7 @@ export default function Dashboard() {
                       onClick={handleGenerateQuestions}
                       disabled={isLoadingQuestions}
                       aria-label="Generate AI Doctor Prep Questions using MCP"
-                      className="w-full bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl transition text-xs shadow-sm font-sans"
+                      className="w-full bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl transition text-xs shadow-sm font-sans cursor-pointer"
                     >
                       {isLoadingQuestions ? 'Generating via MCP Tools...' : '✨ Generate Doctor Prep Questions'}
                     </button>
@@ -1553,21 +1552,21 @@ export default function Dashboard() {
                             <button 
                               onClick={handleCopySummary} 
                               aria-label="Copy generated questions to clipboard"
-                              className="text-xs bg-white text-indigo-900 px-3 py-1 rounded-md border border-indigo-300 font-bold"
+                              className="text-xs bg-white text-indigo-900 px-3 py-1 rounded-md border border-indigo-300 font-bold cursor-pointer"
                             >
                               {copied ? '✅ Copied' : '📋 Copy'}
                             </button>
                             <button 
                               onClick={handleDownloadPDF} 
                               aria-label="Download agenda as PDF"
-                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded-md font-bold transition"
+                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded-md font-bold transition cursor-pointer"
                             >
                               📥 Download PDF
                             </button>
                             <button 
                               onClick={handlePrintAgenda} 
                               aria-label="Print appointment agenda"
-                              className="text-xs bg-indigo-700 text-white px-3 py-1 rounded-md font-bold"
+                              className="text-xs bg-indigo-700 text-white px-3 py-1 rounded-md font-bold cursor-pointer"
                             >
                               🖨️ Print Agenda
                             </button>
@@ -1621,7 +1620,7 @@ export default function Dashboard() {
                                 setSelectedDateIndex(idx);
                                 setDayModalLog(log);
                               }}
-                              className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center relative ${
+                              className={`p-2 rounded-lg border text-center transition flex flex-col items-center justify-center relative cursor-pointer ${
                                 isSelected
                                   ? 'bg-indigo-600 border-indigo-400 text-white font-extrabold shadow-md scale-105 z-10'
                                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
@@ -1670,7 +1669,7 @@ export default function Dashboard() {
                                   key={i}
                                   type="button"
                                   onClick={() => toggleMedForDate(med.name, selectedDateIndex)}
-                                  className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between ${
+                                  className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer ${
                                     isTaken
                                       ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-bold'
                                       : 'bg-white border-indigo-200 text-slate-800 hover:bg-indigo-100'
@@ -1705,7 +1704,7 @@ export default function Dashboard() {
                                   updated[selectedDateIndex].mood = m;
                                   setCalendarLogs(updated);
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer ${
                                   activeDayLog.mood === m
                                     ? 'bg-indigo-700 text-white border-indigo-700'
                                     : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
@@ -1758,7 +1757,7 @@ export default function Dashboard() {
                                 updated[selectedDateIndex].caffeineIntake = e.target.value as any;
                                 setCalendarLogs(updated);
                               }}
-                              className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                              className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600 cursor-pointer"
                             >
                               <option value="None ☕">None ☕</option>
                               <option value="1-2 Cups ☕">1-2 Cups ☕</option>
@@ -1781,7 +1780,7 @@ export default function Dashboard() {
                                 updated[selectedDateIndex].sleepHours = parseFloat(e.target.value);
                                 setCalendarLogs(updated);
                               }}
-                              className="w-full accent-indigo-600"
+                              className="w-full accent-indigo-600 cursor-pointer"
                             />
                           </div>
 
@@ -1797,7 +1796,7 @@ export default function Dashboard() {
                                 updated[selectedDateIndex].stressLevel = parseInt(e.target.value);
                                 setCalendarLogs(updated);
                               }}
-                              className="w-full accent-indigo-600"
+                              className="w-full accent-indigo-600 cursor-pointer"
                             />
                           </div>
                         </div>
@@ -2014,7 +2013,7 @@ export default function Dashboard() {
                 setShowEHRModal(false);
                 setLinkStep('select');
               }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
             >
               ✕
             </button>
@@ -2189,7 +2188,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
             <button
               onClick={() => setDayModalLog(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
             >
               ✕
             </button>
@@ -2264,7 +2263,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => setDayModalLog(null)}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs transition font-sans"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs transition font-sans cursor-pointer"
             >
               Close Summary
             </button>
