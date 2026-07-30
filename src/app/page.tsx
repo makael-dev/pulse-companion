@@ -218,7 +218,7 @@ export default function Dashboard() {
   // --- EHR CONNECT & MULTI-STEP OAUTH STATE ---
   const [showEHRModal, setShowEHRModal] = useState(false);
   const [linkStep, setLinkStep] = useState<'select' | 'auth' | 'sync'>('select');
-  const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('e1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
+  const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('');
   
   // STARTS DISCONNECTED (NULL) ON PAGE RELOAD
   const [connectedPortal, setConnectedPortal] = useState<string | null>(null);
@@ -440,6 +440,9 @@ export default function Dashboard() {
         const data = await res.json();
         const list: PatientProfile[] = data.data || [];
         setPatients(list);
+        if (list.length > 0) {
+          setSelectedTargetPatient(list[0].id);
+        }
       } catch (err) {
         console.error('Failed to load patient records:', err);
       }
@@ -588,7 +591,7 @@ export default function Dashboard() {
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              {caregiverMode ? '👨‍gsub Caregiver View Active' : '👤 Patient View'}
+              {caregiverMode ? '👨‍👩‍👧 Caregiver View Active' : '👤 Patient View'}
             </button>
 
             <button
@@ -2004,7 +2007,7 @@ export default function Dashboard() {
         <LabGaugeModal lab={selectedLab} onClose={() => setSelectedLab(null)} />
       )}
 
-      {/* 🏥 MULTI-STEP SMART-ON-FHIR LINKING MODAL WITH DYNAMIC SANDBOX PATIENT LIST */}
+      {/* 🏥 MULTI-STEP SMART-ON-FHIR LINKING MODAL WITH VISIBLE SCROLL CONTAINER */}
       {showEHRModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
@@ -2018,7 +2021,7 @@ export default function Dashboard() {
               ✕
             </button>
 
-            {/* STEP 1: SELECT HEALTH SYSTEM / SANDBOX PATIENT */}
+            {/* STEP 1: SELECT HEALTH SYSTEM / SANDBOX PATIENT CARDS */}
             {linkStep === 'select' && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
@@ -2033,29 +2036,31 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                  Available patient records synced from your Medblocks Sandbox:
-                </p>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-600 font-medium">
+                    Available patient records synced from Medblocks:
+                  </span>
+                  <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">
+                    {patients.length} Loaded
+                  </span>
+                </div>
 
-                {/* DYNAMIC SCROLLABLE LIST OF ALL SANDBOX PATIENTS */}
-                <div className="space-y-2 pt-1 text-xs max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                {/* VISIBLE SCROLLBAR CONTAINER FOR ALL PATIENTS */}
+                <div className="space-y-2 pt-1 text-xs h-64 overflow-y-scroll pr-2 border border-slate-100 rounded-xl p-1 bg-slate-50/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-indigo-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                   {patients && patients.length > 0 ? (
                     patients.map((p) => (
-                      <button
+                      <div
                         key={p.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTargetPatient(p.id);
-                          setLinkStep('auth');
-                        }}
-                        className={`w-full p-2.5 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                          patient?.id === p.id
-                            ? 'bg-indigo-50 border-indigo-400 text-indigo-950 font-bold'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                        className={`p-3 rounded-xl border transition flex items-center justify-between ${
+                          selectedTargetPatient === p.id
+                            ? 'bg-indigo-50 border-indigo-500 shadow-sm'
+                            : 'bg-white hover:bg-slate-50 border-slate-200'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-base">👤</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0">
+                            {p.name.charAt(0)}
+                          </div>
                           <div>
                             <span className="block text-xs font-extrabold text-slate-900">
                               {p.name}
@@ -2065,12 +2070,18 @@ export default function Dashboard() {
                             </span>
                           </div>
                         </div>
-                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${
-                          patient?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                          {patient?.id === p.id ? 'Active' : 'Connect'}
-                        </span>
-                      </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTargetPatient(p.id);
+                            setLinkStep('auth');
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] transition shadow-sm cursor-pointer shrink-0"
+                        >
+                          Connect →
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="p-4 text-center text-xs text-slate-500 italic">
