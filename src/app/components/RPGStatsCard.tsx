@@ -1,73 +1,77 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Flame, Heart, Zap, Award, BicepsFlexed, Sparkles } from 'lucide-react';
+import { Shield, Flame, Heart, Zap, BicepsFlexed, Sparkles } from 'lucide-react';
 
 interface RPGStatsProps {
   patient: any;
   calendarLogs: any[];
+  deadliftPR?: number;
+  benchPressPR?: number;
+  mileRunPR?: string; // e.g. "7:45"
+  fiveKRunPR?: string; // e.g. "24:30"
 }
 
-type FFXIVJob = {
+type JobRole = {
   id: string;
   name: string;
-  role: 'Tank' | 'Melee DPS' | 'Physical Ranged' | 'Healer' | 'Caster';
+  category: 'Tank' | 'Melee DPS' | 'Physical Ranged' | 'Healer' | 'Caster';
   icon: string;
   perkTitle: string;
   perkDesc: string;
   primaryStat: 'STR' | 'END' | 'VIT' | 'REC';
 };
 
-const FFXIV_JOBS: FFXIVJob[] = [
+const JOB_ROLES: JobRole[] = [
   {
-    id: 'war',
+    id: 'warrior',
     name: 'Warrior (WAR)',
-    role: 'Tank',
+    category: 'Tank',
     icon: '🪓',
     perkTitle: 'Inner Release',
     perkDesc: '+15% Strength XP gain on heavy compound lift PRs',
     primaryStat: 'STR',
   },
   {
-    id: 'pld',
+    id: 'paladin',
     name: 'Paladin (PLD)',
-    role: 'Tank',
+    category: 'Tank',
     icon: '🛡️',
     perkTitle: 'Hallowed Ground',
     perkDesc: '+10% Vitality XP for consistent optimal blood pressure',
     primaryStat: 'VIT',
   },
   {
-    id: 'mnk',
+    id: 'monk',
     name: 'Monk (MNK)',
-    role: 'Melee DPS',
+    category: 'Melee DPS',
     icon: '🥊',
     perkTitle: 'Greased Lightning',
     perkDesc: '+12% Speed & Endurance XP on high-tempo workouts',
     primaryStat: 'STR',
   },
   {
-    id: 'brd',
+    id: 'bard',
     name: 'Bard (BRD)',
-    role: 'Physical Ranged',
+    category: 'Physical Ranged',
     icon: '🏹',
     perkTitle: 'Peloton Pace',
     perkDesc: '+15% Endurance XP when meeting daily step target (8k+ steps)',
     primaryStat: 'END',
   },
   {
-    id: 'whm',
+    id: 'white_mage',
     name: 'White Mage (WHM)',
-    role: 'Healer',
+    category: 'Healer',
     icon: '🪄',
     perkTitle: 'Curaja Recovery',
     perkDesc: '+15% Recovery XP boost when logging 7.5+ hours of sleep',
     primaryStat: 'REC',
   },
   {
-    id: 'blm',
+    id: 'black_mage',
     name: 'Black Mage (BLM)',
-    role: 'Caster',
+    category: 'Caster',
     icon: '🔮',
     perkTitle: 'Ley Lines Focus',
     perkDesc: '+10% Vitality XP for maintaining low daily stress scores',
@@ -75,30 +79,63 @@ const FFXIV_JOBS: FFXIVJob[] = [
   },
 ];
 
-export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
-  // FFXIV Selected Job State
-  const [selectedJobId, setSelectedJobId] = useState<string>('war');
-  const activeJob = FFXIV_JOBS.find((j) => j.id === selectedJobId) || FFXIV_JOBS[0];
+// Helper: Convert MM:SS string to total seconds
+function parseTimeToSeconds(timeStr: string): number {
+  if (!timeStr) return 480; // default 8 mins
+  const parts = timeStr.split(':');
+  if (parts.length === 2) {
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+  return parseInt(timeStr, 10) || 480;
+}
 
-  // DYNAMIC STAT CALCULATIONS
-  const deadlift = 285; // lbs
-  const strStat = Math.min(100, Math.round((deadlift / 400) * 100));
+export default function RPGStatsCard({ 
+  patient, 
+  calendarLogs, 
+  deadliftPR = 285, 
+  benchPressPR = 225,
+  mileRunPR = '7:45',
+  fiveKRunPR = '24:30'
+}: RPGStatsProps) {
+  const [selectedJobId, setSelectedJobId] = useState<string>('warrior');
+  const activeJob = JOB_ROLES.find((j) => j.id === selectedJobId) || JOB_ROLES[0];
 
-  const steps = 7420;
-  const endStat = Math.min(100, Math.round((steps / 8000) * 100));
+  // --- 1. DYNAMIC STRENGTH (STR) ---
+  // Influenced by Deadlift PR + Bench Press PR
+  const deadliftScore = (deadliftPR / 400) * 100;
+  const benchScore = (benchPressPR / 300) * 100;
+  const strStat = Math.min(100, Math.round((deadliftScore * 0.6) + (benchScore * 0.4)));
 
+  // --- 2. DYNAMIC ENDURANCE (END) ---
+  // Influenced by Daily Steps (7,420 / 8k) + 1 Mile Run Time + 5K Time
+  const stepScore = Math.min(100, (7420 / 8000) * 100);
+  const mileSeconds = parseTimeToSeconds(mileRunPR);
+  // Benchmark: 5:00 (100 pts) down to 10:00 (50 pts)
+  const mileScore = Math.max(30, Math.min(100, Math.round(150 - (mileSeconds / 6)))); 
+  const endStat = Math.min(100, Math.round((stepScore * 0.5) + (mileScore * 0.5)));
+
+  // --- 3. DYNAMIC VITALITY (VIT) ---
+  // Influenced by Resting Heart Rate + Blood Pressure Status
   const hr = parseInt(patient?.vitals?.heartRate || '68', 10);
-  const vitStat = Math.max(10, Math.min(100, 150 - hr));
+  const hrScore = Math.max(20, Math.min(100, 150 - hr));
+  const isBPNormal = patient?.vitals?.bpStatus === 'normal';
+  const vitStat = Math.min(100, Math.round(isBPNormal ? hrScore : hrScore * 0.85));
 
+  // --- 4. DYNAMIC RECOVERY (REC) ---
+  // Influenced by 28-Day Sleep Average + Daily Stress Score
   const avgSleep = calendarLogs.reduce((acc, curr) => acc + (curr.sleepHours || 7), 0) / (calendarLogs.length || 1);
-  const recStat = Math.min(100, Math.round((avgSleep / 8) * 100));
+  const sleepScore = (avgSleep / 8) * 100;
+  const avgStress = calendarLogs.reduce((acc, curr) => acc + (curr.stressLevel || 4), 0) / (calendarLogs.length || 1);
+  const stressPenalty = (avgStress / 10) * 15; // Penalty up to 15 points
+  const recStat = Math.max(10, Math.min(100, Math.round(sleepScore - stressPenalty)));
 
+  // Overall Character Level (Fully Dynamic across all trackers)
   const charLevel = Math.round((strStat + endStat + vitStat + recStat) / 4);
   const expPercent = 74;
 
   return (
     <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/40 shadow-2xl space-y-5 text-white">
-      {/* HEADER: LEVEL & FFXIV JOB SYSTEM SELECTOR */}
+      {/* HEADER: LEVEL & JOB SELECTOR */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-800/50 pb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-xl shadow-lg border border-indigo-400">
@@ -107,16 +144,16 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-lg">{activeJob.icon}</span>
-              <label htmlFor="ffxiv-job-select" className="sr-only">Select FFXIV Fitness Job</label>
+              <label htmlFor="job-role-select" className="sr-only">Select Fitness Job</label>
               <select
-                id="ffxiv-job-select"
+                id="job-role-select"
                 value={selectedJobId}
                 onChange={(e) => setSelectedJobId(e.target.value)}
                 className="bg-slate-950 text-amber-300 font-extrabold text-xs px-3 py-1.5 rounded-lg border-2 border-amber-400/60 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer shadow-md"
               >
-                {FFXIV_JOBS.map((job) => (
+                {JOB_ROLES.map((job) => (
                   <option key={job.id} value={job.id}>
-                    {job.icon} {job.name} [{job.role}]
+                    {job.icon} {job.name} [{job.category}]
                   </option>
                 ))}
               </select>
@@ -142,9 +179,9 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
         </div>
       </div>
 
-      {/* STATS GRID (HIGHLIGHTS PRIMARY STAT FOR ACTIVE JOB) */}
+      {/* DYNAMIC STATS GRID */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* STR */}
+        {/* STR (INFLUENCED BY DEADLIFT + BENCH) */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'STR' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-purple-500/30'
         }`}>
@@ -153,12 +190,14 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
             <span className="text-sm text-white font-extrabold">{strStat}</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-            <div className="bg-purple-500 h-full rounded-full" style={{ width: `${strStat}%` }}></div>
+            <div className="bg-purple-500 h-full rounded-full transition-all duration-300" style={{ width: `${strStat}%` }}></div>
           </div>
-          <span className="text-[10px] text-slate-400 block mt-1">Deadlift: 285 lbs</span>
+          <span className="text-[10px] text-slate-400 block mt-1 font-medium">
+            DL: {deadliftPR}lb • Bench: {benchPressPR}lb
+          </span>
         </div>
 
-        {/* END */}
+        {/* END (INFLUENCED BY STEPS + RUN TIMES) */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'END' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-sky-500/30'
         }`}>
@@ -167,12 +206,14 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
             <span className="text-sm text-white font-extrabold">{endStat}</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-            <div className="bg-sky-400 h-full rounded-full" style={{ width: `${endStat}%` }}></div>
+            <div className="bg-sky-400 h-full rounded-full transition-all duration-300" style={{ width: `${endStat}%` }}></div>
           </div>
-          <span className="text-[10px] text-slate-400 block mt-1">Steps: {steps} / 8k</span>
+          <span className="text-[10px] text-slate-400 block mt-1 font-medium">
+            Steps: 7.4k • 1M: {mileRunPR}
+          </span>
         </div>
 
-        {/* VIT */}
+        {/* VIT (INFLUENCED BY RESTING HR + BP) */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'VIT' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-rose-500/30'
         }`}>
@@ -181,12 +222,14 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
             <span className="text-sm text-white font-extrabold">{vitStat}</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-            <div className="bg-rose-500 h-full rounded-full" style={{ width: `${vitStat}%` }}></div>
+            <div className="bg-rose-500 h-full rounded-full transition-all duration-300" style={{ width: `${vitStat}%` }}></div>
           </div>
-          <span className="text-[10px] text-slate-400 block mt-1">Resting HR: {hr} bpm</span>
+          <span className="text-[10px] text-slate-400 block mt-1 font-medium">
+            RHR: {hr} bpm • BP: {patient?.vitals?.bp || '118/78'}
+          </span>
         </div>
 
-        {/* REC */}
+        {/* REC (INFLUENCED BY SLEEP + STRESS INDEX) */}
         <div className={`p-3 rounded-xl bg-slate-950/80 border transition-all ${
           activeJob.primaryStat === 'REC' ? 'border-amber-400 ring-2 ring-amber-400/30 shadow-lg' : 'border-emerald-500/30'
         }`}>
@@ -195,13 +238,15 @@ export default function RPGStatsCard({ patient, calendarLogs }: RPGStatsProps) {
             <span className="text-sm text-white font-extrabold">{recStat}</span>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-            <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${recStat}%` }}></div>
+            <div className="bg-emerald-400 h-full rounded-full transition-all duration-300" style={{ width: `${recStat}%` }}></div>
           </div>
-          <span className="text-[10px] text-slate-400 block mt-1">Avg Sleep: {avgSleep.toFixed(1)}h</span>
+          <span className="text-[10px] text-slate-400 block mt-1 font-medium">
+            Sleep: {avgSleep.toFixed(1)}h • Stress: {avgStress.toFixed(0)}/10
+          </span>
         </div>
       </div>
 
-      {/* ACTIVE FFXIV JOB PERK BUFF BANNER */}
+      {/* ACTIVE JOB PERK BUFF BANNER */}
       <div className="p-3 rounded-xl bg-indigo-950/70 border border-amber-400/40 flex items-center justify-between text-xs shadow-inner">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
