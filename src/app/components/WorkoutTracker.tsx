@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trophy, BicepsFlexed, Timer, Edit3, Check } from 'lucide-react';
+import { Trophy, BicepsFlexed, Timer, Edit3, Check, Sparkles } from 'lucide-react';
 
 interface WorkoutTrackerProps {
   patient: any;
@@ -13,6 +13,7 @@ interface WorkoutTrackerProps {
   onUpdateBenchPressPR: (val: number) => void;
   onUpdateMileRunPR: (val: string) => void;
   onUpdateFiveKRunPR: (val: string) => void;
+  onOpenGenerator?: () => void;
 }
 
 export default function WorkoutTracker({
@@ -25,6 +26,7 @@ export default function WorkoutTracker({
   onUpdateBenchPressPR,
   onUpdateMileRunPR,
   onUpdateFiveKRunPR,
+  onOpenGenerator,
 }: WorkoutTrackerProps) {
   const [editingCard, setEditingCard] = useState<string | null>(null);
 
@@ -50,10 +52,22 @@ export default function WorkoutTracker({
             </p>
           </div>
         </div>
-        <span className="text-xs font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          Active Fitness Profile
-        </span>
+        
+        <div className="flex items-center gap-2">
+          {onOpenGenerator && (
+            <button
+              onClick={onOpenGenerator}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow transition cursor-pointer flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Generate AI Workout
+            </button>
+          )}
+
+          <span className="text-xs font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Active Fitness Profile
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -69,7 +83,7 @@ export default function WorkoutTracker({
                   onUpdateDeadliftPR(tempDeadlift);
                   setEditingCard(null);
                 }}
-                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1"
+                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1 cursor-pointer"
               >
                 <Check className="w-3 h-3" /> Save
               </button>
@@ -79,7 +93,7 @@ export default function WorkoutTracker({
                   setTempDeadlift(deadliftPR);
                   setEditingCard('deadlift');
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" /> Edit PR
               </button>
@@ -138,7 +152,7 @@ export default function WorkoutTracker({
                   onUpdateMileRunPR(tempMile);
                   setEditingCard(null);
                 }}
-                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1"
+                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1 cursor-pointer"
               >
                 <Check className="w-3 h-3" /> Save
               </button>
@@ -148,7 +162,7 @@ export default function WorkoutTracker({
                   setTempMile(mileRunPR);
                   setEditingCard('mile');
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" /> Edit PR
               </button>
@@ -207,7 +221,7 @@ export default function WorkoutTracker({
                   onUpdateBenchPressPR(tempBench);
                   setEditingCard(null);
                 }}
-                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1"
+                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1 cursor-pointer"
               >
                 <Check className="w-3 h-3" /> Save
               </button>
@@ -217,7 +231,7 @@ export default function WorkoutTracker({
                   setTempBench(benchPressPR);
                   setEditingCard('bench');
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" /> Edit PR
               </button>
@@ -276,7 +290,7 @@ export default function WorkoutTracker({
                   onUpdateFiveKRunPR(tempFiveK);
                   setEditingCard(null);
                 }}
-                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1"
+                className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded flex items-center gap-1 cursor-pointer"
               >
                 <Check className="w-3 h-3" /> Save
               </button>
@@ -286,7 +300,7 @@ export default function WorkoutTracker({
                   setTempFiveK(fiveKRunPR);
                   setEditingCard('fivek');
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" /> Edit PR
               </button>

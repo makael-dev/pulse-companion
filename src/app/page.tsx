@@ -13,6 +13,7 @@ import AppointmentPrepTimeline from './components/AppointmentPrepTimeline';
 import WorkoutTracker from './components/WorkoutTracker';
 import RPGStatsCard from './components/RPGStatsCard';
 import NutritionRiskModal from './components/NutritionRiskModal';
+import WorkoutGeneratorModal from './components/WorkoutGeneratorModal';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
@@ -175,16 +176,17 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// 🗓️ ACCURATE DYNAMIC REAL-WORLD CALENDAR GENERATOR
 function generateMonthDays(year: number, monthIndex: number): CalendarDayLog[] {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayLabels = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const monthAbbr = MONTH_NAMES[monthIndex].substring(0, 3);
   
   const days: CalendarDayLog[] = [];
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(year, monthIndex, d);
-    const dayLabel = dayLabels[dateObj.getDay()];
+    const realDate = new Date(year, monthIndex, d);
+    const dayLabel = dayLabels[realDate.getDay()]; // Gets accurate real day of week
     const dateStr = `${monthAbbr} ${d}`;
 
     days.push({
@@ -234,42 +236,20 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
-  // --- WELCOME & HOW-TO GUIDE MODAL STATE ---
+  // --- WELCOME & WORKOUT MODAL STATES ---
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(true);
+  const [showWorkoutModal, setShowWorkoutModal] = useState<boolean>(false);
 
-  // --- 12-MONTH CALENDAR ENGINE STATE WITH LOCALSTORAGE PERSISTENCE ---
+  // --- 12-MONTH CALENDAR ENGINE STATE (DEFAULT AUGUST 2026) ---
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(0);
-  const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('pulse_calendar_Jan_2026');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return generateMonthDays(2026, 0);
-  });
-  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(10);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(7); // 7 = August
+  const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateMonthDays(2026, 7));
+  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(0);
 
+  // DYNAMIC RE-GENERATION WHEN CHANGING MONTH OR YEAR
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storageKey = `pulse_calendar_${MONTH_NAMES[selectedMonthIndex].substring(0, 3)}_${selectedYear}`;
-      localStorage.setItem(storageKey, JSON.stringify(calendarLogs));
-    }
-  }, [calendarLogs, selectedMonthIndex, selectedYear]);
-
-  useEffect(() => {
-    const monthAbbr = MONTH_NAMES[selectedMonthIndex].substring(0, 3);
-    const storageKey = `pulse_calendar_${monthAbbr}_${selectedYear}`;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        setCalendarLogs(JSON.parse(saved));
-        setSelectedDateIndex(0);
-        return;
-      } catch (e) { console.error(e); }
-    }
-    setCalendarLogs(generateMonthDays(selectedYear, selectedMonthIndex));
+    const generated = generateMonthDays(selectedYear, selectedMonthIndex);
+    setCalendarLogs(generated);
     setSelectedDateIndex(0);
   }, [selectedYear, selectedMonthIndex]);
 
@@ -392,7 +372,7 @@ export default function Dashboard() {
   const [needReferral, setNeedReferral] = useState(false);
   const [needLabs, setNeedLabs] = useState(false);
 
-  const activeDayLog = calendarLogs[selectedDateIndex] || calendarLogs[calendarLogs.length - 1];
+  const activeDayLog = calendarLogs[selectedDateIndex] || calendarLogs[0];
 
   const toggleMedForDate = (medName: string, dateIdx: number) => {
     const updated = [...calendarLogs];
@@ -837,13 +817,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* QUICK START STEPS */}
               <div className="space-y-3 text-xs">
                 <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
                   <span className="font-extrabold text-indigo-950 block text-xs">🚀 How to Get Started (3 Quick Steps):</span>
                   <ol className="list-decimal pl-4 space-y-1 text-slate-700 font-medium">
                     <li>Click <strong>🔗 Connect Health Records</strong> in the top menu to select a sandbox record (e.g., Paul Tremblay).</li>
-                    <li>Explore the 4 primary tabs below to view vitals, log symptoms, or sync workouts.</li>
+                    <li>Explore the 4 primary tabs below to view vitals, log symptoms, or generate workouts.</li>
                     <li>Ask the <strong>Pulse AI Assistant</strong> (bottom right drawer) to log notes, answer prescription questions, or review adherence!</li>
                   </ol>
                 </div>
@@ -871,15 +850,16 @@ export default function Dashboard() {
 
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="font-bold text-slate-900 block">• 🏃 Activity & Fitness Sync</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Apple Health step telemetry, workout PR benchmarks, and optional RPG gamification.</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Apple Health telemetry, PR benchmarks, <strong>AI Workout Generator</strong>, & optional RPG gamification.</p>
                     </div>
                   </div>
                 </div>
 
-                {/* FEATURE HIGHLIGHTS */}
+                {/* FEATURE HIGHLIGHTS INCLUDING AI WORKOUTS */}
                 <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 space-y-1">
                   <span className="font-extrabold text-slate-900 block">✨ Special Features:</span>
                   <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                    • <strong>🏋️ AI Workout Generator:</strong> Generate custom routines by muscle group or equipment via Tab 4 or chat prompts.<br />
                     • <strong>🥗 Meal AI Scan:</strong> Snap/describe meals to check sodium/glycemic clash against diagnoses.<br />
                     • <strong>🚨 Emergency ID:</strong> Instant wallet card printout with QR codes and allergen alerts.<br />
                     • <strong>🔒 Privacy Controls:</strong> Fine-grained data toggles to hide or share clinical modules.
@@ -2029,7 +2009,7 @@ export default function Dashboard() {
                       <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                           <h3 className="text-sm font-extrabold text-slate-900">
-                            📅 Unified Health Record for: <span className="text-indigo-700">{activeDayLog.dateStr}</span> ({activeDayLog.dayLabel})
+                            📅 Unified Health Record for: <span className="text-indigo-700">{activeDayLog.dateStr} ({activeDayLog.dayLabel})</span>
                           </h3>
                           <span className="text-xs text-slate-500 font-medium">Auto-saves to browser & AI chat</span>
                         </div>
@@ -2246,7 +2226,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH GAMIFICATION FILTER FIX */}
+            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH GENERATOR TRIGGER */}
             {activeTab === 'fitness' && (
               <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
                 {consentPermissions.shareFitness ? (
@@ -2272,6 +2252,7 @@ export default function Dashboard() {
                       onUpdateBenchPressPR={(val) => setBenchPressPR(val)}
                       onUpdateMileRunPR={(val) => setMileRunPR(val)}
                       onUpdateFiveKRunPR={(val) => setFiveKRunPR(val)}
+                      onOpenGenerator={() => setShowWorkoutModal(true)}
                     />
 
                     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -2347,7 +2328,7 @@ export default function Dashboard() {
                     <span className="text-3xl">🔒</span>
                     <h3 className="text-sm font-bold text-slate-900">Activity Telemetry Module Redacted</h3>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      Apple Health step and exercise telemetry has been set to private via Patient Privacy Controls.
+                      This section has been set to private via Patient Privacy Controls.
                     </p>
                   </div>
                 )}
@@ -2369,7 +2350,7 @@ export default function Dashboard() {
       <PulseChatDrawer 
         patient={patient} 
         calendarLogs={calendarLogs}
-        selectedDateLabel={activeDayLog ? activeDayLog.dateStr : 'Jan 11'}
+        selectedDateLabel={activeDayLog ? activeDayLog.dateStr : 'Aug 1'}
         enableRPGSystem={enableRPGSystem}
         activeTab={activeTab}
         onLogToCalendar={(noteText, targetDateStr) => handleUpdateCurrentDayNote(noteText, targetDateStr)}
@@ -2388,6 +2369,14 @@ export default function Dashboard() {
           patient={patient}
           onClose={() => setShowNutritionModal(false)}
           onLogMealNote={(mealText) => handleUpdateCurrentDayNote(mealText)}
+        />
+      )}
+
+      {showWorkoutModal && (
+        <WorkoutGeneratorModal
+          patient={patient}
+          onClose={() => setShowWorkoutModal(false)}
+          onLogWorkout={(exercise, details) => handleLogWorkoutToCalendar(exercise, details)}
         />
       )}
 
