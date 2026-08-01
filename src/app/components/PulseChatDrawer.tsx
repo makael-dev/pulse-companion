@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, X, Bot, User, ChevronUp, ChevronDown, Check, Calendar, Dumbbell } from 'lucide-react';
+import { Sparkles, Send, X, Bot, User } from 'lucide-react';
 
 interface PulseChatDrawerProps {
   patient: any;
@@ -12,6 +12,7 @@ interface PulseChatDrawerProps {
   onLogToCalendar: (noteText: string, targetDateStr?: string) => void;
   onLogWorkoutToCalendar: (exercise: string, details: string, targetDateStr?: string) => void;
   onLogMedsForDate: (targetDateStr: string) => void;
+  onLogAllMedsForMonth?: () => void;
 }
 
 export default function PulseChatDrawer({
@@ -22,7 +23,8 @@ export default function PulseChatDrawer({
   activeTab,
   onLogToCalendar,
   onLogWorkoutToCalendar,
-  onLogMedsForDate
+  onLogMedsForDate,
+  onLogAllMedsForMonth
 }: PulseChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: 'assistant' | 'user'; content: string }>>([
@@ -45,7 +47,6 @@ export default function PulseChatDrawer({
     }
   }, [messages, isOpen]);
 
-  // Dynamically reset assistant greeting when switching patient records
   useEffect(() => {
     if (patient) {
       setMessages([
@@ -67,13 +68,10 @@ export default function PulseChatDrawer({
     setIsLoading(true);
 
     try {
-      // Direct intent detection for client-side calendar logging
       const lower = textToSend.toLowerCase();
       if (lower.includes('log note') || lower.includes('add note')) {
         const noteContent = textToSend.replace(/log note|add note/gi, '').trim();
         onLogToCalendar(noteContent || textToSend, selectedDateLabel);
-      } else if (lower.includes('took meds') || lower.includes('log meds')) {
-        onLogMedsForDate(selectedDateLabel);
       }
 
       const response = await fetch('/api/chat', {
@@ -84,12 +82,32 @@ export default function PulseChatDrawer({
           history: messages,
           patientContext: patient,
           selectedDateLabel,
+          calendarLogs,
           enableRPGSystem,
           activeTab
         })
       });
 
       const data = await response.json();
+
+      // Trigger UI updates based on AI action
+      if (data.action === 'LOG_ALL_MEDS_MONTH' && onLogAllMedsForMonth) {
+        onLogAllMedsForMonth();
+      } else if (data.action === 'LOG_MEDS') {
+        const targetDate = data.targetDateStr || selectedDateLabel;
+        onLogMedsForDate(targetDate);
+      } else if (data.action === 'LOG_WORKOUT') {
+        const targetDate = data.targetDateStr || selectedDateLabel;
+        onLogWorkoutToCalendar(
+          data.exercise || 'Workout', 
+          data.details || 'Logged via AI Companion', 
+          targetDate
+        );
+      } else if (data.action === 'LOG_NOTE') {
+        const targetDate = data.targetDateStr || selectedDateLabel;
+        onLogToCalendar(data.noteText || textToSend, targetDate);
+      }
+
       if (data.reply) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
       } else {
@@ -109,7 +127,6 @@ export default function PulseChatDrawer({
     }
   };
 
-  // Dynamic Prompt Chips based on current connected patient's exact vitals and active prescriptions
   const bpValue = patient?.vitals?.bp || '120/80';
   const activeMedName = patient?.medications?.[0]?.name?.split(' ')[0] || 'Medications';
 
@@ -132,7 +149,6 @@ export default function PulseChatDrawer({
         </button>
       ) : (
         <div className="bg-slate-950 text-white rounded-2xl shadow-2xl border border-indigo-500/30 w-80 sm:w-96 flex flex-col h-[520px] overflow-hidden">
-          {/* Drawer Header */}
           <div className="p-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
@@ -158,7 +174,6 @@ export default function PulseChatDrawer({
             </button>
           </div>
 
-          {/* Messages Scroll Body */}
           <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs">
             {messages.map((msg, idx) => (
               <div
@@ -195,7 +210,6 @@ export default function PulseChatDrawer({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Dynamic Suggested Quick Action Chips */}
           <div className="px-3 py-1.5 bg-slate-900/60 border-t border-slate-800/80 flex flex-wrap gap-1.5">
             <button
               onClick={() => handleSendMessage(`Explain my BP ${bpValue}`)}
@@ -217,7 +231,6 @@ export default function PulseChatDrawer({
             </button>
           </div>
 
-          {/* Chat Input Field */}
           <div className="p-3 bg-slate-900 border-t border-slate-800">
             <form
               onSubmit={(e) => {

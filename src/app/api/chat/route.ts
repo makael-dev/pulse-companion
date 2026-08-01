@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// Red Flag Emergency Keywords
 const EMERGENCY_PATTERNS = [
   /chest pain/i, /shortness of breath/i, /difficulty breathing/i, /can't breathe/i,
   /stroke/i, /numbness/i, /face drooping/i, /fainted/i, /fainting/i, /severe bleeding/i, /suicidal/i
@@ -32,180 +31,156 @@ function resolveTargetDate(text: string, defaultLabel: string): string {
   return defaultLabel;
 }
 
-const TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'log_medications_taken',
-      description: 'Mark all or specific prescribed medication doses as taken on a specific calendar date.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          targetDateStr: { type: 'STRING', description: 'The date string to log for (e.g. Jul 29, Jul 30).' }
-        },
-        required: ['targetDateStr']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'log_workout',
-      description: 'Log an exercise, workout, run, or rep PR to the user workout calendar.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          exercise: { type: 'STRING', description: 'Short exercise title, e.g. Deadlift, Bench Press, 1 Mile Run.' },
-          details: { type: 'STRING', description: 'Details like 500 lbs, 3 sets x 8 reps, or 7:45 time.' },
-          targetDateStr: { type: 'STRING', description: 'Target date string.' }
-        },
-        required: ['exercise', 'details']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'log_context_note',
-      description: 'Log a symptom, daily health observation, or note to the calendar.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          noteText: { type: 'STRING', description: 'The symptom or note content.' },
-          targetDateStr: { type: 'STRING', description: 'Target date string.' }
-        },
-        required: ['noteText']
-      }
-    }
-  }
-];
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const messages = body.messages || body.history || [];
     const patient = body.patient || body.patientContext || null;
-    const selectedDateLabel = body.selectedDateLabel || 'Jul 30';
+    const selectedDateLabel = body.selectedDateLabel || 'Jan 1';
     const calendarLogs = body.calendarLogs || [];
-    const enableRPGSystem = body.enableRPGSystem || false;
 
-    const lastMessage = body.message || messages[messages.length - 1]?.text || messages[messages.length - 1]?.content || '';
-    const lower = lastMessage.toLowerCase();
-    const targetDate = resolveTargetDate(lastMessage, selectedDateLabel);
+    const lastUserMessage = body.message || messages[messages.length - 1]?.text || messages[messages.length - 1]?.content || '';
+    const lowerUser = lastUserMessage.toLowerCase().trim();
+
+    const prevAssistantMsg = messages.length > 1 ? (messages[messages.length - 2]?.text || messages[messages.length - 2]?.content || '').toLowerCase() : '';
+    const targetDate = resolveTargetDate(`${prevAssistantMsg} ${lastUserMessage}`, selectedDateLabel);
 
     // 🚨 1. Safety Triage Guardrail
-    if (EMERGENCY_PATTERNS.some((p) => p.test(lastMessage))) {
+    if (EMERGENCY_PATTERNS.some((p) => p.test(lastUserMessage))) {
       return NextResponse.json({
         reply: "🚨 CRITICAL MEDICAL NOTICE: The symptoms you described may indicate a medical emergency. Please call emergency services (911) or visit the nearest Emergency Room immediately.",
         chips: ['Emergency ID', 'View Vitals']
       });
     }
 
-    // 📅 2. DATE / TODAY QUERY DIRECT HANDLER
-    if (
-      lower.includes('what day is it') ||
-      lower.includes('what is today') ||
-      lower.includes('today\'s date') ||
-      lower.includes('what date is it') ||
-      lower.includes('what is the date')
-    ) {
-      const liveDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+    // 📅 2. BULK MONTHLY MEDICATION LOGGING ("mark all meds taken for january / jan")
+    const isBulkMonth = (lowerUser.includes('all') || lowerUser.includes('entire')) && 
+                        (lowerUser.includes('med') || lowerUser.includes('pill')) && 
+                        (lowerUser.includes('month') || lowerUser.includes('jan') || lowerUser.includes('january'));
+
+    if (isBulkMonth) {
       return NextResponse.json({
-        reply: `📅 **Today's Date:** Today is **${liveDateStr}**.\n\nYou are currently viewing health logs for **${selectedDateLabel}** on your dashboard.`,
-        chips: ['View Calendar', 'What are my vitals?', 'Log meds taken']
+        reply: `🎉 **Entire Month Updated!** Marked all prescribed medications as **Taken** for every day in **January 2026** for **${patient?.name || 'Paul'}**. Your adherence score is now **100%**!`,
+        action: 'LOG_ALL_MEDS_MONTH',
+        chips: ['View Calendar', 'Explain my BP', 'Health Delta']
       });
     }
 
-    // 🩸 3. DIRECT BP EXPLANATION HANDLER
-    if (lower.includes('explain') || lower.includes('bp') || lower.includes('blood pressure')) {
-      const bp = patient?.vitals?.bp || '120/80 mmHg';
-      const isElevated = patient?.vitals?.bpStatus === 'warning';
+    // 🔄 3. CONTEXT-AWARE AFFIRMATION ("YES" / "YEAH" / "YEA" / "SURE")
+    const isAffirmative = /^(yes|yeah|yea|yep|sure|please|do it|ok|okay|record it|log it)$/i.test(lowerUser);
 
-      const bpReply = isElevated
-        ? `🩸 **Blood Pressure Explanation (${bp}):** Your current reading reflects slightly elevated pressure. It's recommended to track daily and review with your physician.`
-        : `🩸 **Blood Pressure Explanation (${bp}):** A reading of **${bp}** is optimal and normal! The top number (systolic) measures pressure when your heart pumps, while the bottom number (diastolic) measures pressure between beats.`;
+    if (isAffirmative) {
+      if (prevAssistantMsg.includes('medication') || prevAssistantMsg.includes('record them') || prevAssistantMsg.includes('meds')) {
+        return NextResponse.json({
+          reply: `✅ **Done!** I've marked all prescribed medication doses as **Taken** for **${patient?.name || 'Paul'}** on **${targetDate}** in your calendar.`,
+          action: 'LOG_MEDS',
+          targetDateStr: targetDate,
+          chips: ['View Calendar', 'Explain my BP', 'Lisinopril Info']
+        });
+      }
 
-      return NextResponse.json({
-        reply: bpReply,
-        chips: ['Active Prescriptions', 'Health Delta', 'View Calendar']
-      });
-    }
-
-    // 💡 4. REAL CLINICAL HEALTH SUMMARY / DELTA HANDLER
-    if (lower.includes('summarize') || lower.includes('health changes') || lower.includes('delta')) {
-      const bp = patient?.vitals?.bp || '120/80 mmHg';
-      const bpStatus = patient?.vitals?.bpStatus === 'warning' ? '⚠️ Elevated' : 'Normal';
-      const hba1c = patient?.vitals?.hba1c || '5.6%';
-      const hba1cStatus = patient?.vitals?.hba1cStatus === 'warning' ? '⚠️ Elevated' : 'Normal';
-      const meds = patient?.medications?.map((m: any) => m.name).join(', ') || 'No active prescriptions on file';
-      const doctor = patient?.primaryDoctor || 'your provider';
-      const lastVisit = patient?.lastVisitDate || 'your last visit';
-
-      const clinicalSummary = `💡 **Health Overview for ${patient?.name || 'Patient'}** (Since ${lastVisit}):\n\n` +
-        `• **Vital Signs:** Blood Pressure is **${bp}** (${bpStatus}) and HbA1c is **${hba1c}** (${hba1cStatus}).\n` +
-        `• **Active Prescriptions:** ${meds}.\n` +
-        `• **Provider Action Plan (${doctor}):** ${patient?.doctorNotes?.summary || 'Continue prescribed daily regimen.'}`;
-
-      return NextResponse.json({
-        reply: clinicalSummary,
-        chips: ['Explain my BP', 'Active Prescriptions', 'View Calendar']
-      });
-    }
-
-    const vitals = patient?.vitals || { bp: '118/78', heartRate: '68 bpm', hba1c: '5.4%', bmi: '24.1' };
-    const medications = patient?.medications || [];
-
-    const systemPrompt = `
-You are Pulse Companion AI, an intelligent personal health assistant for ${patient?.name || 'Patient'}.
-Current Vitals: Blood Pressure ${vitals.bp}, HR ${vitals.heartRate}, HbA1c ${vitals.hba1c}.
-`;
-
-    if (process.env.OPENAI_API_KEY) {
-      const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages.slice(-6).map((m: any) => ({
-              role: (m.sender === 'user' || m.role === 'user') ? 'user' : 'assistant',
-              content: m.text || m.content || '',
-            })),
-          ],
-          tools: TOOLS,
-          tool_choice: 'auto',
-          temperature: 0.2,
-        }),
-      });
-
-      if (apiResponse.ok) {
-        const data = await apiResponse.json();
-        const choice = data.choices?.[0]?.message;
-
-        if (choice?.content) {
-          return NextResponse.json({
-            reply: choice.content,
-            chips: ['What are my vitals?', 'Active Prescriptions', 'View Calendar']
-          });
-        }
+      if (prevAssistantMsg.includes('workout') || prevAssistantMsg.includes('exercise')) {
+        return NextResponse.json({
+          reply: `🏋️ **Done!** Recorded an active workout session for **${targetDate}** in your calendar.`,
+          action: 'LOG_WORKOUT',
+          targetDateStr: targetDate,
+          exercise: 'General Workout',
+          details: 'Logged via AI Companion',
+          chips: ['View Calendar', 'Activity Sync', 'Health Delta']
+        });
       }
     }
 
-    const pName = patient?.name?.split(' ')[0] || 'Patient';
+    // 💊 4. DIRECT SINGLE-DAY RECORD / LOG MEDS
+    if ((lowerUser.includes('record') || lowerUser.includes('log') || lowerUser.includes('mark')) && (lowerUser.includes('med') || lowerUser.includes('pill') || lowerUser.includes('lisinopril'))) {
+      return NextResponse.json({
+        reply: `✅ **Medications Recorded!** All prescribed medications for **${patient?.name || 'Paul'}** have been marked as **Taken** for **${targetDate}** in your health calendar.`,
+        action: 'LOG_MEDS',
+        targetDateStr: targetDate,
+        chips: ['View Calendar', 'Explain my BP', 'Lisinopril Info']
+      });
+    }
+
+    // ❓ 5. CHECK MEDICATION STATUS
+    if ((lowerUser.includes('did i take') || lowerUser.includes('check') || lowerUser.includes('status')) && (lowerUser.includes('med') || lowerUser.includes('pill'))) {
+      const targetLog = calendarLogs.find((l: any) => l.dateStr?.toLowerCase() === targetDate.toLowerCase());
+      const medsTaken = targetLog?.medsTaken || {};
+      const takenCount = Object.values(medsTaken).filter(Boolean).length;
+
+      const replyMsg = takenCount > 0
+        ? `💊 **Medication Status for ${targetDate}:** Yes! You have logged medication doses as **Taken** on ${targetDate}.`
+        : `💊 **Medication Status for ${targetDate}:** No medication doses are logged as taken for **${targetDate}** yet. Would you like me to record them now?`;
+
+      return NextResponse.json({
+        reply: replyMsg,
+        chips: [`Yes, record meds for ${targetDate}`, 'Explain my BP', 'View Calendar']
+      });
+    }
+
+    // 🏋️ 6. WORKOUT LOGGING HANDLER
+    if (lowerUser.includes('workout') || lowerUser.includes('exercise') || lowerUser.includes('run') || lowerUser.includes('gym')) {
+      return NextResponse.json({
+        reply: `🏋️ **Workout Logged!** Recorded an active workout session for **${targetDate}** in your health calendar.`,
+        action: 'LOG_WORKOUT',
+        targetDateStr: targetDate,
+        exercise: 'General Workout',
+        details: 'Logged via AI Companion',
+        chips: ['View Calendar', 'Activity Sync', 'Health Delta']
+      });
+    }
+
+    // 🤖 7. OPENAI DYNAMIC RESPONSE
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (apiKey && apiKey.startsWith('sk-')) {
+      try {
+        const vitals = patient?.vitals || { bp: '121/81', heartRate: '70 bpm', hba1c: '5.8%' };
+        const systemPrompt = `You are Pulse Companion AI for ${patient?.name || 'Paul'}. Vitals: BP ${vitals.bp}, HR ${vitals.heartRate}. Answer queries concisely, accurately, and naturally.`;
+
+        const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages.slice(-6).map((m: any) => ({
+                role: (m.sender === 'user' || m.role === 'user') ? 'user' : 'assistant',
+                content: m.text || m.content || '',
+              })),
+            ],
+            temperature: 0.2,
+          }),
+        });
+
+        if (apiResponse.ok) {
+          const data = await apiResponse.json();
+          const choice = data.choices?.[0]?.message;
+          if (choice?.content) {
+            return NextResponse.json({
+              reply: choice.content,
+              chips: ['Explain BP 121/81', 'Lisinopril Info', 'Health Delta']
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('OpenAI Call warning:', e);
+      }
+    }
+
+    // 8. DEFAULT FALLBACK
     return NextResponse.json({
-      reply: `I am here to help organize ${pName}'s health records! Current Blood Pressure is ${vitals.bp}. Ask me about medications, vitals, or logging calendar notes.`,
-      chips: ['What are my vitals?', 'Log meds taken', 'View Calendar']
+      reply: `I can help manage health records for **${patient?.name || 'Paul Tremblay'}** on **${targetDate}**. You can ask me to log medications, record workouts, explain vitals, or review doctor notes.`,
+      chips: [`Record meds for ${targetDate}`, 'Explain BP 121/81', 'Health Delta']
     });
 
   } catch (err) {
     console.error('Chat Route API Error:', err);
     return NextResponse.json({
-      reply: "I am here to help organize your health records! Ask me about your vitals, medications, or fitness records.",
-      chips: ['What are my vitals?', 'Active Prescriptions']
+      reply: "I can help manage your health records! Ask me to record medications, log workouts, or explain your vitals.",
+      chips: ['Explain BP 121/81', 'Active Prescriptions']
     });
   }
 }

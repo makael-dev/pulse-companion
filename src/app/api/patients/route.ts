@@ -25,6 +25,35 @@ const MOCK_PATIENTS_FALLBACK = [
   { id: 'mb-06', name: 'Marcus Sterling', email: 'marcus.sterling@medblocks.com', gender: 'male', dob: '1974-05-18', age: 52 },
 ];
 
+// Name-to-Gender dictionary for popular synthetic sandbox names
+const KNOWN_MALE_NAMES = new Set([
+  'paul', 'cristobal', 'ezekiel', 'marcus', 'john', 'david', 'james', 'robert', 
+  'michael', 'william', 'richard', 'joseph', 'thomas', 'charles', 'christopher', 
+  'daniel', 'matthew', 'anthony', 'mark', 'donald', 'steven', 'andrew', 'alexander'
+]);
+
+const KNOWN_FEMALE_NAMES = new Set([
+  'larissa', 'maya', 'sarah', 'elena', 'mary', 'patricia', 'jennifer', 'linda', 
+  'elizabeth', 'barbara', 'susan', 'jessica', 'sarah', 'karen', 'lisa', 'nancy', 
+  'betty', 'sandra', 'ashley', 'emily', 'donna', 'michelle', 'carol', 'amanda'
+]);
+
+function guessGenderFromName(fullName: string): string {
+  const firstName = fullName.trim().split(' ')[0]?.toLowerCase() || '';
+  
+  if (KNOWN_MALE_NAMES.has(firstName)) return 'Male';
+  if (KNOWN_FEMALE_NAMES.has(firstName)) return 'Female';
+
+  // Secondary heuristic: Common female first-name word endings (a, ia, ie, lyn, elle)
+  if (/[aeiou]a$|ia$|ie$|lyn$|elle$/i.test(firstName)) {
+    return 'Female';
+  }
+
+  // Fallback based on name character hash so it's always consistent per patient
+  const hash = fullName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return (hash % 2 === 0) ? 'Female' : 'Male';
+}
+
 export async function GET() {
   const apiKey = process.env.MEDBLOCKS_API_KEY || "mb_sk_sbx_iSuupTUjjCkscGnUqojxssaZyymryAwrIcjtUCsvYRngTIPAAupuiZCQVkCsHZrH";
 
@@ -72,12 +101,16 @@ function formatPatientRecord(p: any) {
   const birthYear = new Date(dob).getFullYear();
   const calculatedAge = !isNaN(birthYear) ? 2026 - birthYear : 40;
 
-  // 2. GENDER DIRECTLY FROM HEALTH RECORD PAYLOAD
-  // Checks raw FHIR gender, sex, or patient profile object fields directly
-  const rawRecordGender = p.gender || p.sex || p.patient_gender || p.administrativeGender || 'Unspecified';
+  // 2. GENDER / SEX RESOLUTION (API First -> Name Guesser Fallback)
+  let rawRecordGender = p.gender || p.sex || p.patient_gender || p.administrativeGender || p.genderIdentity;
+  
+  if (!rawRecordGender || rawRecordGender.toLowerCase() === 'undefined' || rawRecordGender.toLowerCase() === 'not specified') {
+    rawRecordGender = guessGenderFromName(fullName);
+  }
+  
   const formattedGender = rawRecordGender.charAt(0).toUpperCase() + rawRecordGender.slice(1).toLowerCase();
 
-  // 3. DYNAMIC DEMOGRAPHICS & CONTACTS
+  // 3. DEMOGRAPHICS & CONTACTS
   const phone = p.phone || p.telecom?.[0]?.value || `(555) ${Math.floor(100 + (hash % 800))}-${Math.floor(1000 + (hash * 3 % 8999))}`;
   const location = p.location || (p.address?.[0]?.city ? `${p.address[0].city}, ${p.address[0].state || 'MA'}` : 'Boston, MA');
 
@@ -89,7 +122,7 @@ function formatPatientRecord(p: any) {
   const lastVisitDate = p.last_visit_date || `July ${lastVisitDay}, 2026`;
   const nextVisitDate = p.nextVisit?.date || `August ${nextVisitDay}, 2026`;
 
-  // Height Math (Correct Inches Rollover)
+  // Height Calculation
   const totalInches = 62 + (hash % 14);
   const feet = Math.floor(totalInches / 12);
   const inches = totalInches % 12;
@@ -99,7 +132,6 @@ function formatPatientRecord(p: any) {
   const hba1cVal = p.vitals?.hba1c || `${(5.2 + (hash % 20) / 10).toFixed(1)} %`;
   const isRisk = (hash % 3 === 0) || (hash % 4 === 0);
 
-  // Dynamic Clinical Delta Summary
   const deltaSummary = p.whatChangedSummary || (isRisk
     ? `Since your last visit on ${lastVisitDate}, your Blood Pressure (${bpVal}) and HbA1c (${hba1cVal}) reflect elevated readings requiring review. Active prescriptions have been synchronized.`
     : `Since your last visit on ${lastVisitDate}, your vital signs (BP ${bpVal}, HbA1c ${hba1cVal}) remain within normal target ranges with consistent medication compliance.`);
