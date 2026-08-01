@@ -12,6 +12,7 @@ import LabGaugeModal from './components/LabGaugeModal';
 import AppointmentPrepTimeline from './components/AppointmentPrepTimeline';
 import WorkoutTracker from './components/WorkoutTracker';
 import RPGStatsCard from './components/RPGStatsCard';
+import NutritionRiskModal from './components/NutritionRiskModal';
 
 export const CONDITION_TRANSLATIONS: Record<string, string> = {
   'Mild Bronchial Asthma': 'Airway inflammation causing occasional shortness of breath, wheezing, or tightness in the chest.',
@@ -209,7 +210,6 @@ function generateMonthDays(year: number, monthIndex: number): CalendarDayLog[] {
   return days;
 }
 
-// 🩺 CLINICAL BLOOD PRESSURE CATEGORIZER
 function getBPCategory(bpStr: string | undefined): { label: string; bg: string; text: string; border: string } {
   if (!bpStr) return { label: 'Normal', bg: 'bg-emerald-100', text: 'text-emerald-950', border: 'border-emerald-300' };
   const parts = bpStr.split('/');
@@ -234,9 +234,12 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
+  // --- WELCOME & HOW-TO GUIDE MODAL STATE ---
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(true);
+
   // --- 12-MONTH CALENDAR ENGINE STATE WITH LOCALSTORAGE PERSISTENCE ---
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(0); // January (0-indexed)
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(0);
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pulse_calendar_Jan_2026');
@@ -246,9 +249,8 @@ export default function Dashboard() {
     }
     return generateMonthDays(2026, 0);
   });
-  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(10); // Default Jan 11
+  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(10);
 
-  // Save calendar logs whenever they update
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storageKey = `pulse_calendar_${MONTH_NAMES[selectedMonthIndex].substring(0, 3)}_${selectedYear}`;
@@ -256,7 +258,6 @@ export default function Dashboard() {
     }
   }, [calendarLogs, selectedMonthIndex, selectedYear]);
 
-  // Load calendar when changing year or month
   useEffect(() => {
     const monthAbbr = MONTH_NAMES[selectedMonthIndex].substring(0, 3);
     const storageKey = `pulse_calendar_${monthAbbr}_${selectedYear}`;
@@ -272,18 +273,15 @@ export default function Dashboard() {
     setSelectedDateIndex(0);
   }, [selectedYear, selectedMonthIndex]);
 
-  // --- DAY SUMMARY POPUP MODAL STATE ---
   const [dayModalLog, setDayModalLog] = useState<CalendarDayLog | null>(null);
+  const [showNutritionModal, setShowNutritionModal] = useState(false);
 
-  // --- EHR CONNECT & MULTI-STEP OAUTH STATE WITH PORTAL SELECTOR ---
   const [showEHRModal, setShowEHRModal] = useState(false);
   const [linkStep, setLinkStep] = useState<'provider' | 'select' | 'login' | 'auth' | 'sync'>('provider');
   const [selectedProvider, setSelectedProvider] = useState<string>('Epic MyChart');
   const [selectedTargetPatient, setSelectedTargetPatient] = useState<string>('');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  
-  // STARTS DISCONNECTED (NULL) ON PAGE RELOAD
   const [connectedPortal, setConnectedPortal] = useState<string | null>(null);
 
   const handleDisconnectEHR = () => {
@@ -292,19 +290,14 @@ export default function Dashboard() {
     setShowEHRModal(false);
   };
 
-  // --- MASTER GAMIFICATION SYSTEM TOGGLE ---
   const [enableRPGSystem, setEnableRPGSystem] = useState<boolean>(false);
-
-  // --- DYNAMIC FITNESS PR STATES WITH PERSISTENCE ---
   const [deadliftPR, setDeadliftPR] = useState<number>(300);
   const [benchPressPR, setBenchPressPR] = useState<number>(315);
   const [mileRunPR, setMileRunPR] = useState<string>('7:45');
   const [fiveKRunPR, setFiveKRunPR] = useState<string>('26:40');
 
-  // --- LAB GAUGE MODAL STATE ---
   const [selectedLab, setSelectedLab] = useState<LabItem | null>(null);
 
-  // --- CONSENT & PRIVACY CONTROL STATE ---
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentPermissions, setConsentPermissions] = useState({
     shareVitals: true,
@@ -425,7 +418,6 @@ export default function Dashboard() {
     return { monthIdx: monthIdx !== -1 ? monthIdx : null, dayNum };
   };
 
-  // 1. BULK ALL MEDS LOGGING FOR ENTIRE CURRENT MONTH
   const handleLogAllMedsForMonth = () => {
     setCalendarLogs((prevLogs) => {
       const allMedsTaken: Record<string, boolean> = {};
@@ -449,7 +441,6 @@ export default function Dashboard() {
     });
   };
 
-  // 📄 EXPORT MONTHLY ADHERENCE LOG TO CSV
   const handleExportMonthlyCSV = () => {
     let csvContent = 'data:text/csv;charset=utf-8,Date,Day,Sleep Hours,Mood,Stress Index,Meds Taken Count,Workout Notes\n';
     
@@ -468,7 +459,6 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
-  // 2. SINGLE-DAY MEDICATION LOGGING HANDLER
   const handleLogMedsForDate = (targetDateStr: string) => {
     const { monthIdx, dayNum } = parseTargetMonthAndDay(targetDateStr);
 
@@ -689,14 +679,12 @@ export default function Dashboard() {
     window.print();
   };
 
-  // --- Patient-Filtered Medication Adherence Calculation ---
   const activeDayMeds = activeDayLog?.medsTaken || {};
   const patientMedNames = patient?.medications?.map((m) => m.name) || [];
   const totalMedsCount = patientMedNames.length;
   const takenMedsCount = patientMedNames.filter((medName) => activeDayMeds[medName]).length;
   const adherencePercent = totalMedsCount > 0 ? Math.min(100, Math.round((takenMedsCount / totalMedsCount) * 100)) : 0;
 
-  // --- MONTHLY ADHERENCE BADGE SCORE ---
   const daysLoggedWithMeds = calendarLogs.filter(
     (log) => Object.values(log.medsTaken || {}).filter(Boolean).length > 0
   ).length;
@@ -704,7 +692,8 @@ export default function Dashboard() {
     ? Math.round((daysLoggedWithMeds / calendarLogs.length) * 100) 
     : 0;
 
-  // --- DYNAMIC CLINICAL PROVIDER NOTES FALLBACK FORMATTER ---
+  const currentMedStreak = daysLoggedWithMeds;
+
   const getFormattedDoctorSummary = (p: PatientProfile | null) => {
     if (!p) return '';
     const rawSummary = p.doctorNotes?.summary || '';
@@ -732,16 +721,13 @@ export default function Dashboard() {
     ];
   };
 
-  // Get clinical BP stage category
   const bpCategory = getBPCategory(patient?.vitals?.bp);
 
   return (
     <div className="min-h-screen bg-slate-100/80 text-slate-900 font-sans print:bg-white print:p-0 flex flex-col justify-between relative overflow-x-hidden">
-      {/* BACKGROUND AMBIENT GLOWS */}
       <div className="fixed top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none -z-10"></div>
       <div className="fixed top-1/3 right-10 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
-      {/* TOP ANNOUNCEMENT / STATUS BAR */}
       <div className="bg-slate-900 text-white text-[11px] py-1.5 px-4 print:hidden border-b border-slate-800">
         <div className="max-w-6xl mx-auto flex items-center justify-between font-medium">
           <div className="flex items-center gap-2">
@@ -760,7 +746,6 @@ export default function Dashboard() {
       </div>
 
       <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6">
-        {/* Header */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-200 gap-3 print:hidden bg-white/70 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -770,6 +755,13 @@ export default function Dashboard() {
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowWelcomeModal(true)}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-extrabold px-3 py-1.5 rounded-full text-xs border border-indigo-200 transition flex items-center gap-1 cursor-pointer"
+            >
+              ❓ How It Works
+            </button>
+
             <button
               onClick={() => {
                 setLinkStep('provider');
@@ -785,6 +777,13 @@ export default function Dashboard() {
               className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1 cursor-pointer"
             >
               🔒 Privacy Controls
+            </button>
+
+            <button
+              onClick={() => setShowNutritionModal(true)}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-full text-xs shadow-sm transition flex items-center gap-1 cursor-pointer"
+            >
+              🥗 Meal AI Scan
             </button>
 
             <button
@@ -813,7 +812,91 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* CONSENT & PRIVACY CONTROL MODAL */}
+        {/* 🌟 WELCOME & PLATFORM GUIDE MODAL */}
+        {showWelcomeModal && (
+          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
+              <button
+                onClick={() => setShowWelcomeModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-sm shrink-0">
+                  💜
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Welcome to Pulse Companion! 👋
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Your Connected Health Record & Clinical Navigation Portal
+                  </p>
+                </div>
+              </div>
+
+              {/* QUICK START STEPS */}
+              <div className="space-y-3 text-xs">
+                <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
+                  <span className="font-extrabold text-indigo-950 block text-xs">🚀 How to Get Started (3 Quick Steps):</span>
+                  <ol className="list-decimal pl-4 space-y-1 text-slate-700 font-medium">
+                    <li>Click <strong>🔗 Connect Health Records</strong> in the top menu to select a sandbox record (e.g., Paul Tremblay).</li>
+                    <li>Explore the 4 primary tabs below to view vitals, log symptoms, or sync workouts.</li>
+                    <li>Ask the <strong>Pulse AI Assistant</strong> (bottom right drawer) to log notes, answer prescription questions, or review adherence!</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="font-extrabold text-slate-800 block uppercase tracking-wider text-[11px]">
+                    📍 Where to Find Things:
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-900 block">• 📈 Summary & EHR Record</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">View vitals, active prescriptions, doctor notes, and predictive disease risk models.</p>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-900 block">• 🩺 Symptom Log & Doctor Prep</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Track current symptoms, countdown to upcoming visits, and generate AI doctor agendas.</p>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-900 block">• 🌙 12-Month Calendar</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Interactive daily wellness tracking for sleep, mood, medications, and CSV exports.</p>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-900 block">• 🏃 Activity & Fitness Sync</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Apple Health step telemetry, workout PR benchmarks, and optional RPG gamification.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FEATURE HIGHLIGHTS */}
+                <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 space-y-1">
+                  <span className="font-extrabold text-slate-900 block">✨ Special Features:</span>
+                  <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                    • <strong>🥗 Meal AI Scan:</strong> Snap/describe meals to check sodium/glycemic clash against diagnoses.<br />
+                    • <strong>🚨 Emergency ID:</strong> Instant wallet card printout with QR codes and allergen alerts.<br />
+                    • <strong>🔒 Privacy Controls:</strong> Fine-grained data toggles to hide or share clinical modules.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowWelcomeModal(false)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow font-sans cursor-pointer"
+              >
+                Got It! Take Me to My Dashboard →
+              </button>
+            </div>
+          </div>
+        )}
+
         {showConsentModal && (
           <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
@@ -838,7 +921,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* MASTER RPG GAMIFICATION SYSTEM TOGGLE */}
               <div className="flex items-center justify-between p-3.5 bg-indigo-950 text-white rounded-xl border-2 border-indigo-500/50 shadow-md">
                 <div>
                   <span className="font-extrabold text-xs block text-amber-300">
@@ -1027,7 +1109,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* DYNAMIC EMERGENCY WALLET CARD MODAL */}
         {showEmergencyModal && patient && (
           <div 
             role="dialog" 
@@ -1109,7 +1190,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* DYNAMIC PATIENT QR CODE */}
                 <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <QRCodeSVG 
                     value={JSON.stringify({
@@ -1143,7 +1223,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* DISCONNECTED EMPTY STATE CARD (DEFAULT ON LOAD) */}
         {!patient ? (
           <div className="bg-white p-12 text-center rounded-2xl border border-slate-300 shadow-sm space-y-4 my-8">
             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-3xl mx-auto font-bold">
@@ -1167,7 +1246,6 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Navigation Tabs (Full Width Grid) */}
             <nav aria-label="Dashboard Navigation Tabs" className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 print:hidden bg-white/60 p-1.5 rounded-2xl border border-slate-200/80 shadow-sm">
               <button
                 onClick={() => setActiveTab('vitals')}
@@ -1238,10 +1316,14 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* STATIC SYNC BADGE */}
-                    <div className="flex items-center gap-2 bg-indigo-900/80 border border-indigo-700/60 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-100 shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span>FHIR Sync Active</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-extrabold rounded-lg">
+                        🔥 {currentMedStreak} Day Adherence Streak
+                      </span>
+                      <div className="flex items-center gap-2 bg-indigo-900/80 border border-indigo-700/60 px-3 py-1 rounded-lg text-xs font-bold text-indigo-100 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>FHIR Sync Active</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1255,6 +1337,44 @@ export default function Dashboard() {
                       <div>👨‍⚕️ Provider: <strong className="text-white">{patient.primaryDoctor || patient.doctorNotes?.doctor || 'Dr. Sarah Vance, MD'}</strong></div>
                     </div>
                   )}
+                </div>
+
+                {/* 🧬 PREDICTIVE HEALTH DISEASE RISK MODEL CARD WITH CLINICAL DISCLAIMER */}
+                <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-sm space-y-2">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5 uppercase">
+                      🧬 Predictive Health & Disease Risk Engine
+                    </span>
+                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">
+                      AI Bio-Model
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold">10-Year Cardiovascular Event Risk</span>
+                        <strong className="text-amber-400 text-sm font-extrabold">6.4% (Borderline Low)</strong>
+                      </div>
+                      <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">
+                        BP Driven
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold">Type 2 Diabetes Progression Score</span>
+                        <strong className="text-emerald-400 text-sm font-extrabold">Optimal (HbA1c 5.8%)</strong>
+                      </div>
+                      <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold">
+                        Stable
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-400 flex items-center justify-between font-medium">
+                    <span>⚠️ AI Disclaimer: Predictive models are algorithmic estimations for statistical review only. They do not constitute a medical diagnosis or clinical prognosis.</span>
+                  </div>
                 </div>
 
                 {/* ACTIONABLE CLINICAL RISK FLAG BANNER */}
@@ -1346,7 +1466,6 @@ export default function Dashboard() {
                           </h3>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center">
-                            {/* SMART CLINICAL BP CARD WITH CATEGORY BADGE */}
                             <div className={`p-2.5 rounded-lg border text-xs ${bpCategory.bg} ${bpCategory.border}`}>
                               <span className="text-xs text-slate-700 font-bold block">BP</span>
                               <strong className={`text-xs block mt-0.5 font-bold ${bpCategory.text}`}>{patient.vitals.bp}</strong>
@@ -1414,10 +1533,14 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* ACTIVE PRESCRIPTIONS */}
                       <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3 md:col-span-1">
-                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex justify-between">
-                          <span>💊 Active Prescriptions</span>
-                          <span className="text-indigo-800 font-bold">{patient.medications?.length || 0} active</span>
-                        </h3>
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                            💊 Active Prescriptions
+                          </h3>
+                          <span className="text-[10px] bg-emerald-100 text-emerald-950 font-extrabold px-1.5 py-0.5 rounded border border-emerald-300">
+                            🛡️ Safety Checked
+                          </span>
+                        </div>
                         <div className="space-y-2">
                           {consentPermissions.shareMeds ? (
                             patient.medications?.map((med, i) => (
@@ -1544,7 +1667,6 @@ export default function Dashboard() {
                     )}
 
                     <div className="space-y-2 pt-2">
-                      {/* LABS ACCORDION WITH CLICKABLE GAUGE TRIGGER */}
                       <div className="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
                         <button
                           onClick={() => setShowLabs(!showLabs)}
@@ -1591,7 +1713,6 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* ENCOUNTERS ACCORDION */}
                       <div className="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
                         <button
                           onClick={() => setShowEncounters(!showEncounters)}
@@ -1632,7 +1753,6 @@ export default function Dashboard() {
             {/* TAB 2: SYMPTOM LOG, COUNTDOWN TIMELINE & DOCTOR PREP */}
             {activeTab === 'symptoms' && (
               <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
-                {/* DYNAMIC APPOINTMENT PREP COUNTDOWN CHECKLIST */}
                 {consentPermissions.sharePrepTimeline ? (
                   <AppointmentPrepTimeline targetDate={patient?.nextVisit?.date || patient?.lastVisitDate || 'August 18, 2026'} />
                 ) : (
@@ -1808,8 +1928,6 @@ export default function Dashboard() {
                 {consentPermissions.shareMentalHealth ? (
                   <>
                     <div className="bg-slate-950 text-white p-5 rounded-xl space-y-4 border border-slate-800 shadow-md">
-                      
-                      {/* MONTH & YEAR HEADER NAVIGATION WITH ADHERENCE BADGE AND CSV EXPORT */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -1819,7 +1937,6 @@ export default function Dashboard() {
                             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-900 text-indigo-200 border border-indigo-700">
                               🏷️ {monthlyAdherenceScore}% Monthly Adherence
                             </span>
-                            {/* CSV EXPORT BUTTON */}
                             <button
                               onClick={handleExportMonthlyCSV}
                               className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 transition cursor-pointer"
@@ -1875,7 +1992,6 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* DYNAMIC MONTH DAY GRID */}
                       <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-11 lg:grid-cols-16 gap-1.5 pt-1">
                         {calendarLogs.map((log, idx) => {
                           const isSelected = idx === selectedDateIndex;
@@ -1909,7 +2025,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* UNIFIED DAILY CALENDAR DETAILS CARD */}
                     {activeDayLog && (
                       <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-5">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-2">
@@ -1919,7 +2034,6 @@ export default function Dashboard() {
                           <span className="text-xs text-slate-500 font-medium">Auto-saves to browser & AI chat</span>
                         </div>
 
-                        {/* 1. MEDICATION TRACKER FOR SELECTED CALENDAR DAY */}
                         {consentPermissions.shareMeds && patient?.medications && (
                           <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-xl space-y-2.5">
                             <div className="flex items-center justify-between border-b border-indigo-200 pb-1.5">
@@ -1962,7 +2076,6 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        {/* 2. SLEEP & MOOD LOG */}
                         <div className="space-y-3">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-800 block">Daily Mood & Energy:</label>
@@ -2073,7 +2186,6 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        {/* 3. WORKOUT & REPS LOG FOR SELECTED CALENDAR DAY */}
                         <div className="bg-purple-50/70 border border-purple-200 p-4 rounded-xl space-y-2.5">
                           <div className="flex items-center justify-between border-b border-purple-200 pb-1.5">
                             <span className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
@@ -2102,7 +2214,6 @@ export default function Dashboard() {
                           )}
                         </div>
 
-                        {/* 4. DAILY NOTES */}
                         <div className="space-y-1.5">
                           <label htmlFor="date-note-input" className="text-xs font-bold text-slate-800 block">
                             ✏️ Daily Context Notes for {activeDayLog.dateStr}:
@@ -2135,12 +2246,11 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 4: DYNAMIC ACTIVITY & FITNESS TELEMETRY */}
+            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH GAMIFICATION FILTER FIX */}
             {activeTab === 'fitness' && (
               <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
                 {consentPermissions.shareFitness ? (
                   <div className="space-y-4">
-                    {/* 🎮 RPG Video Game Character Stats Sheet */}
                     {enableRPGSystem && consentPermissions.shareRPGStats && (
                       <RPGStatsCard 
                         patient={patient} 
@@ -2152,7 +2262,6 @@ export default function Dashboard() {
                       />
                     )}
 
-                    {/* 🏋️ Personal Fitness Records & Dynamic Demographic Benchmarks */}
                     <WorkoutTracker 
                       patient={patient} 
                       deadliftPR={deadliftPR}
@@ -2165,7 +2274,6 @@ export default function Dashboard() {
                       onUpdateFiveKRunPR={(val) => setFiveKRunPR(val)}
                     />
 
-                    {/* 🏃‍♂️ Apple Health Sync Overview */}
                     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
                         <div>
@@ -2209,7 +2317,6 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        {/* DYNAMIC RESTING HEART RATE DERIVED FROM PATIENT VITALS */}
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                           <div className="flex justify-between items-start">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resting Heart Rate</span>
@@ -2224,7 +2331,6 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* DYNAMIC AI CLINICAL TELEMETRY SUMMARY */}
                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
                         <span className="text-base">💡</span>
                         <div className="text-xs text-slate-300 space-y-1">
@@ -2251,7 +2357,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* FOOTER MEDICAL DISCLAIMER */}
       <footer className="mt-8 py-4 border-t border-slate-200 bg-white/50 text-center text-[11px] text-slate-500 print:hidden space-y-1">
         <p className="font-semibold text-slate-600">
           ⚠️ Medical Disclaimer
@@ -2261,7 +2366,6 @@ export default function Dashboard() {
         </p>
       </footer>
 
-      {/* FLOATING PULSE AI ASSISTANT WITH EMERGENCY TRIGGER CALLBACK */}
       <PulseChatDrawer 
         patient={patient} 
         calendarLogs={calendarLogs}
@@ -2275,12 +2379,18 @@ export default function Dashboard() {
         onTriggerEmergencyModal={() => setShowEmergencyModal(true)}
       />
 
-      {/* 🩻 LAB SPECTRUM GAUGE MODAL */}
       {selectedLab && (
         <LabGaugeModal lab={selectedLab} onClose={() => setSelectedLab(null)} />
       )}
 
-      {/* 🏥 MULTI-STEP SMART-ON-FHIR LINKING MODAL WITH PORTAL SELECTOR */}
+      {showNutritionModal && (
+        <NutritionRiskModal
+          patient={patient}
+          onClose={() => setShowNutritionModal(false)}
+          onLogMealNote={(mealText) => handleUpdateCurrentDayNote(mealText)}
+        />
+      )}
+
       {showEHRModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
@@ -2294,7 +2404,6 @@ export default function Dashboard() {
               ✕
             </button>
 
-            {/* STEP 1: CHOOSE HEALTH PORTAL / EHR PROVIDER */}
             {linkStep === 'provider' && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
@@ -2347,7 +2456,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* STEP 2: SELECT SANDBOX PATIENT ACCOUNT FOR SELECTED PROVIDER */}
             {linkStep === 'select' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -2376,7 +2484,6 @@ export default function Dashboard() {
                   </span>
                 </div>
 
-                {/* SCROLLABLE PATIENT CARDS */}
                 <div className="space-y-2 pt-1 text-xs h-52 overflow-y-scroll pr-2 border border-slate-100 rounded-xl p-1 bg-slate-50/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-indigo-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                   {patients && patients.length > 0 ? (
                     patients.map((p) => (
@@ -2446,7 +2553,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* STEP 3: PATIENT PORTAL LOGIN SCREEN */}
             {linkStep === 'login' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -2514,7 +2620,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* STEP 4: MOCK OAUTH PORTAL AUTHORIZATION */}
             {linkStep === 'auth' && (
               <div className="space-y-4">
                 <div className="bg-indigo-950 text-white p-3.5 rounded-xl flex items-center justify-between">
@@ -2580,7 +2685,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* STEP 5: LIVE SYNC & PARSING ANIMATION */}
             {linkStep === 'sync' && (
               <div className="p-8 text-center space-y-4">
                 <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -2601,7 +2705,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 📅 DAILY SNAPSHOT SUMMARY MODAL */}
       {dayModalLog && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
