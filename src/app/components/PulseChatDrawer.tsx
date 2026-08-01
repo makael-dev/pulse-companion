@@ -13,6 +13,7 @@ interface PulseChatDrawerProps {
   onLogWorkoutToCalendar: (exercise: string, details: string, targetDateStr?: string) => void;
   onLogMedsForDate: (targetDateStr: string) => void;
   onLogAllMedsForMonth?: () => void;
+  onTriggerEmergencyModal?: () => void;
 }
 
 export default function PulseChatDrawer({
@@ -24,7 +25,8 @@ export default function PulseChatDrawer({
   onLogToCalendar,
   onLogWorkoutToCalendar,
   onLogMedsForDate,
-  onLogAllMedsForMonth
+  onLogAllMedsForMonth,
+  onTriggerEmergencyModal
 }: PulseChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: 'assistant' | 'user'; content: string }>>([
@@ -90,7 +92,12 @@ export default function PulseChatDrawer({
 
       const data = await response.json();
 
-      // Trigger UI updates based on AI action
+      // Check if message is a critical medical emergency
+      if (data.reply && data.reply.includes('CRITICAL MEDICAL NOTICE') && onTriggerEmergencyModal) {
+        onTriggerEmergencyModal();
+      }
+
+      // Trigger UI actions based on AI action
       if (data.action === 'LOG_ALL_MEDS_MONTH' && onLogAllMedsForMonth) {
         onLogAllMedsForMonth();
       } else if (data.action === 'LOG_MEDS') {

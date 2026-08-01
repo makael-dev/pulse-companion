@@ -209,6 +209,25 @@ function generateMonthDays(year: number, monthIndex: number): CalendarDayLog[] {
   return days;
 }
 
+// 🩺 CLINICAL BLOOD PRESSURE CATEGORIZER
+function getBPCategory(bpStr: string | undefined): { label: string; bg: string; text: string; border: string } {
+  if (!bpStr) return { label: 'Normal', bg: 'bg-emerald-100', text: 'text-emerald-950', border: 'border-emerald-300' };
+  const parts = bpStr.split('/');
+  if (parts.length !== 2) return { label: 'Normal', bg: 'bg-emerald-100', text: 'text-emerald-950', border: 'border-emerald-300' };
+  
+  const sys = parseInt(parts[0], 10);
+  const dia = parseInt(parts[1], 10);
+
+  if (sys >= 140 || dia >= 90) {
+    return { label: 'Stage 2 Hypertension', bg: 'bg-rose-100', text: 'text-rose-950', border: 'border-rose-400' };
+  } else if ((sys >= 130 && sys <= 139) || (dia >= 80 && dia <= 89)) {
+    return { label: 'Stage 1 Hypertension', bg: 'bg-amber-100', text: 'text-amber-950', border: 'border-amber-400' };
+  } else if (sys >= 120 && sys <= 129 && dia < 80) {
+    return { label: 'Elevated BP', bg: 'bg-yellow-100', text: 'text-yellow-950', border: 'border-yellow-400' };
+  }
+  return { label: 'Normal BP', bg: 'bg-emerald-100', text: 'text-emerald-950', border: 'border-emerald-300' };
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'vitals' | 'symptoms' | 'wellness' | 'fitness'>('vitals');  
   const [patients, setPatients] = useState<PatientProfile[]>([]);
@@ -428,6 +447,25 @@ export default function Dashboard() {
 
       return updated;
     });
+  };
+
+  // 📄 EXPORT MONTHLY ADHERENCE LOG TO CSV
+  const handleExportMonthlyCSV = () => {
+    let csvContent = 'data:text/csv;charset=utf-8,Date,Day,Sleep Hours,Mood,Stress Index,Meds Taken Count,Workout Notes\n';
+    
+    calendarLogs.forEach((log) => {
+      const takenCount = Object.values(log.medsTaken || {}).filter(Boolean).length;
+      const workoutStr = log.workouts && log.workouts.length > 0 ? log.workouts.map((w) => w.exercise).join('; ') : 'None';
+      csvContent += `"${log.dateStr}","${log.dayLabel}",${log.sleepHours},"${log.mood}",${log.stressLevel},${takenCount},"${workoutStr}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${patient?.name || 'Patient'}_Adherence_Log_${MONTH_NAMES[selectedMonthIndex]}_${selectedYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 2. SINGLE-DAY MEDICATION LOGGING HANDLER
@@ -671,7 +709,6 @@ export default function Dashboard() {
     if (!p) return '';
     const rawSummary = p.doctorNotes?.summary || '';
     
-    // Check if API returned generic developer debug text
     const isGenericDebugText = !rawSummary || 
       rawSummary.toLowerCase().includes('synchronized via medblocks') || 
       rawSummary.toLowerCase().includes('oauth2 smart-on-fhir gateway');
@@ -694,6 +731,9 @@ export default function Dashboard() {
       `Schedule routine follow-up consultation in 4 weeks.`
     ];
   };
+
+  // Get clinical BP stage category
+  const bpCategory = getBPCategory(patient?.vitals?.bp);
 
   return (
     <div className="min-h-screen bg-slate-100/80 text-slate-900 font-sans print:bg-white print:p-0 flex flex-col justify-between relative overflow-x-hidden">
@@ -1297,7 +1337,7 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* VITALS SIGNS & CHART */}
+                    {/* VITALS SIGNS & CHART WITH SMART BP CATEGORIZATION BADGE */}
                     {consentPermissions.shareVitals ? (
                       <>
                         <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
@@ -1306,16 +1346,13 @@ export default function Dashboard() {
                           </h3>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center">
-                            <div className={`p-2.5 rounded-lg border text-xs ${
-                              patient.vitals.bpStatus === 'warning' 
-                                ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold' 
-                                : 'bg-slate-100 border-slate-200 text-slate-900'
-                            }`}>
+                            {/* SMART CLINICAL BP CARD WITH CATEGORY BADGE */}
+                            <div className={`p-2.5 rounded-lg border text-xs ${bpCategory.bg} ${bpCategory.border}`}>
                               <span className="text-xs text-slate-700 font-bold block">BP</span>
-                              <strong className="text-xs block mt-0.5">{patient.vitals.bp}</strong>
-                              {patient.vitals.bpStatus === 'warning' && (
-                                <span className="text-xs font-extrabold text-amber-950 bg-amber-300 px-1.5 rounded block mt-1">⚠️ Elevated</span>
-                              )}
+                              <strong className={`text-xs block mt-0.5 font-bold ${bpCategory.text}`}>{patient.vitals.bp}</strong>
+                              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded block mt-1 uppercase ${bpCategory.bg} ${bpCategory.text} border ${bpCategory.border}`}>
+                                {bpCategory.label}
+                              </span>
                             </div>
 
                             <div className={`p-2.5 rounded-lg border text-xs ${
@@ -1765,24 +1802,30 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 3: FULL 12-MONTH CALENDAR ENGINE WITH ADHERENCE BADGE */}
+            {/* TAB 3: FULL 12-MONTH CALENDAR ENGINE WITH EXPORT CSV BUTTON */}
             {activeTab === 'wellness' && (
               <section aria-label="12-Month Health Calendar & Tracking" className="space-y-4">
                 {consentPermissions.shareMentalHealth ? (
                   <>
                     <div className="bg-slate-950 text-white p-5 rounded-xl space-y-4 border border-slate-800 shadow-md">
                       
-                      {/* MONTH & YEAR HEADER NAVIGATION WITH ADHERENCE BADGE */}
+                      {/* MONTH & YEAR HEADER NAVIGATION WITH ADHERENCE BADGE AND CSV EXPORT */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                               📅 12-Month Interactive Health Calendar
                             </h3>
-                            {/* MONTHLY ADHERENCE BADGE SCORE */}
                             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-900 text-indigo-200 border border-indigo-700">
                               🏷️ {monthlyAdherenceScore}% Monthly Adherence
                             </span>
+                            {/* CSV EXPORT BUTTON */}
+                            <button
+                              onClick={handleExportMonthlyCSV}
+                              className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 transition cursor-pointer"
+                            >
+                              📄 Export CSV Log
+                            </button>
                           </div>
                           <p className="text-base font-extrabold text-white mt-0.5">
                             {MONTH_NAMES[selectedMonthIndex]} {selectedYear}
@@ -2218,7 +2261,7 @@ export default function Dashboard() {
         </p>
       </footer>
 
-      {/* FLOATING PULSE AI ASSISTANT */}
+      {/* FLOATING PULSE AI ASSISTANT WITH EMERGENCY TRIGGER CALLBACK */}
       <PulseChatDrawer 
         patient={patient} 
         calendarLogs={calendarLogs}
@@ -2229,6 +2272,7 @@ export default function Dashboard() {
         onLogWorkoutToCalendar={(exercise, details, targetDateStr) => handleLogWorkoutToCalendar(exercise, details, targetDateStr)}
         onLogMedsForDate={(targetDateStr) => handleLogMedsForDate(targetDateStr)}
         onLogAllMedsForMonth={() => handleLogAllMedsForMonth()}
+        onTriggerEmergencyModal={() => setShowEmergencyModal(true)}
       />
 
       {/* 🩻 LAB SPECTRUM GAUGE MODAL */}
