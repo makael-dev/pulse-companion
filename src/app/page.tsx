@@ -176,7 +176,6 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// 🗓️ ACCURATE DYNAMIC REAL-WORLD CALENDAR GENERATOR
 function generateMonthDays(year: number, monthIndex: number): CalendarDayLog[] {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const dayLabels = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -186,7 +185,7 @@ function generateMonthDays(year: number, monthIndex: number): CalendarDayLog[] {
 
   for (let d = 1; d <= daysInMonth; d++) {
     const realDate = new Date(year, monthIndex, d);
-    const dayLabel = dayLabels[realDate.getDay()]; // Gets accurate real day of week
+    const dayLabel = dayLabels[realDate.getDay()];
     const dateStr = `${monthAbbr} ${d}`;
 
     days.push({
@@ -236,17 +235,14 @@ export default function Dashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patient, setPatient] = useState<PatientProfile | null>(null);
 
-  // --- WELCOME & WORKOUT MODAL STATES ---
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(true);
   const [showWorkoutModal, setShowWorkoutModal] = useState<boolean>(false);
 
-  // --- 12-MONTH CALENDAR ENGINE STATE (DEFAULT AUGUST 2026) ---
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(7); // 7 = August
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(7); // August 2026
   const [calendarLogs, setCalendarLogs] = useState<CalendarDayLog[]>(() => generateMonthDays(2026, 7));
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(0);
 
-  // DYNAMIC RE-GENERATION WHEN CHANGING MONTH OR YEAR
   useEffect(() => {
     const generated = generateMonthDays(selectedYear, selectedMonthIndex);
     setCalendarLogs(generated);
@@ -375,17 +371,21 @@ export default function Dashboard() {
   const activeDayLog = calendarLogs[selectedDateIndex] || calendarLogs[0];
 
   const toggleMedForDate = (medName: string, dateIdx: number) => {
-    const updated = [...calendarLogs];
-    const currentMeds = updated[dateIdx].medsTaken || {};
-    updated[dateIdx].medsTaken = {
-      ...currentMeds,
-      [medName]: !currentMeds[medName],
-    };
-    setCalendarLogs(updated);
-
-    if (dayModalLog && dayModalLog.dateStr === updated[dateIdx].dateStr) {
-      setDayModalLog(updated[dateIdx]);
-    }
+    setCalendarLogs((prevLogs) => {
+      const updated = [...prevLogs];
+      const currentMeds = updated[dateIdx]?.medsTaken || {};
+      updated[dateIdx] = {
+        ...updated[dateIdx],
+        medsTaken: {
+          ...currentMeds,
+          [medName]: !currentMeds[medName],
+        },
+      };
+      if (dayModalLog && dayModalLog.dateStr === updated[dateIdx].dateStr) {
+        setDayModalLog(updated[dateIdx]);
+      }
+      return updated;
+    });
   };
 
   const parseTargetMonthAndDay = (targetDateStr: string) => {
@@ -491,27 +491,33 @@ export default function Dashboard() {
       }
     }
 
-    const updated = [...calendarLogs];
-    let targetIndex = selectedDateIndex;
+    setCalendarLogs((prevLogs) => {
+      const updated = [...prevLogs];
+      let targetIndex = selectedDateIndex;
 
-    if (targetDateStr) {
-      const cleanTarget = targetDateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase();
-      const foundIdx = updated.findIndex(
-        (log) => log.dateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase() === cleanTarget
-      );
-      if (foundIdx !== -1) {
-        targetIndex = foundIdx;
-        setSelectedDateIndex(foundIdx);
+      if (targetDateStr) {
+        const cleanTarget = targetDateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase();
+        const foundIdx = updated.findIndex(
+          (log) => log.dateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase() === cleanTarget
+        );
+        if (foundIdx !== -1) {
+          targetIndex = foundIdx;
+          setSelectedDateIndex(foundIdx);
+        }
       }
-    }
 
-    const existing = updated[targetIndex].notes || '';
-    updated[targetIndex].notes = existing ? `${existing}\n• ${noteText}` : `• ${noteText}`;
-    setCalendarLogs(updated);
+      const existing = updated[targetIndex]?.notes || '';
+      updated[targetIndex] = {
+        ...updated[targetIndex],
+        notes: existing ? `${existing}\n• ${noteText}` : `• ${noteText}`,
+      };
 
-    if (dayModalLog) {
-      setDayModalLog(updated[targetIndex]);
-    }
+      if (dayModalLog && dayModalLog.dateStr === updated[targetIndex].dateStr) {
+        setDayModalLog(updated[targetIndex]);
+      }
+
+      return updated;
+    });
   };
 
   const handleLogWorkoutToCalendar = (exercise: string, details: string, targetDateStr?: string) => {
@@ -535,30 +541,37 @@ export default function Dashboard() {
       }
     }
 
-    const updated = [...calendarLogs];
-    let targetIndex = selectedDateIndex;
+    setCalendarLogs((prevLogs) => {
+      let targetIndex = selectedDateIndex;
 
-    if (targetDateStr) {
-      const cleanTarget = targetDateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase();
-      const foundIdx = updated.findIndex(
-        (log) => log.dateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase() === cleanTarget
-      );
-      if (foundIdx !== -1) {
-        targetIndex = foundIdx;
-        setSelectedDateIndex(foundIdx);
+      if (targetDateStr) {
+        const cleanTarget = targetDateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase();
+        const foundIdx = prevLogs.findIndex(
+          (log) => log.dateStr.replace(/(st|nd|rd|th)/gi, '').trim().toLowerCase() === cleanTarget
+        );
+        if (foundIdx !== -1) {
+          targetIndex = foundIdx;
+          setSelectedDateIndex(foundIdx);
+        }
       }
-    }
 
-    const existingWorkouts = updated[targetIndex].workouts || [];
-    updated[targetIndex].workouts = [
-      ...existingWorkouts,
-      { exercise, details }
-    ];
-    setCalendarLogs(updated);
+      const updated = [...prevLogs];
+      const existingWorkouts = updated[targetIndex]?.workouts || [];
 
-    if (dayModalLog) {
-      setDayModalLog(updated[targetIndex]);
-    }
+      updated[targetIndex] = {
+        ...updated[targetIndex],
+        workouts: [
+          ...existingWorkouts,
+          { exercise, details }
+        ]
+      };
+
+      if (dayModalLog && dayModalLog.dateStr === updated[targetIndex].dateStr) {
+        setDayModalLog(updated[targetIndex]);
+      }
+
+      return updated;
+    });
   };
 
   const [generatedQuestions, setGeneratedQuestions] = useState<string | null>(null);
@@ -855,7 +868,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* FEATURE HIGHLIGHTS INCLUDING AI WORKOUTS */}
                 <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 space-y-1">
                   <span className="font-extrabold text-slate-900 block">✨ Special Features:</span>
                   <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
@@ -877,6 +889,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* PRIVACY & SYSTEM CONTROL MODAL */}
         {showConsentModal && (
           <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative max-h-[85vh] overflow-y-auto">
@@ -1089,6 +1102,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* EMERGENCY HEALTH ID CARD MODAL */}
         {showEmergencyModal && patient && (
           <div 
             role="dialog" 
@@ -1226,6 +1240,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
+            {}
             <nav aria-label="Dashboard Navigation Tabs" className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 print:hidden bg-white/60 p-1.5 rounded-2xl border border-slate-200/80 shadow-sm">
               <button
                 onClick={() => setActiveTab('vitals')}
@@ -1277,7 +1292,7 @@ export default function Dashboard() {
               </button>
             </nav>
 
-            {/* TAB 1 */}
+            {/* TAB 1: SUMMARY & EHR RECORD */}
             {activeTab === 'vitals' && (
               <section aria-label="EHR Health Record Overview" className="space-y-4">
                 <div className="bg-indigo-950 text-white p-5 rounded-xl shadow-md space-y-3 border border-indigo-900">
@@ -1319,7 +1334,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* 🧬 PREDICTIVE HEALTH DISEASE RISK MODEL CARD WITH CLINICAL DISCLAIMER */}
                 <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-sm space-y-2">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                     <span className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5 uppercase">
@@ -1357,7 +1371,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* ACTIONABLE CLINICAL RISK FLAG BANNER */}
                 {patient && (patient.vitals.bpStatus === 'warning' || patient.vitals.hba1cStatus === 'warning') && (
                   <div className="bg-amber-50 border-2 border-amber-400 p-4 rounded-xl shadow-sm text-xs space-y-2">
                     <div className="flex items-center justify-between">
@@ -1401,7 +1414,6 @@ export default function Dashboard() {
                       )
                     )}
 
-                    {/* DYNAMIC, PATIENT-AWARE CLINICAL NOTES DISPLAY */}
                     {consentPermissions.shareDoctorNotes ? (
                       <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-2">
@@ -1437,7 +1449,6 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* VITALS SIGNS & CHART WITH SMART BP CATEGORIZATION BADGE */}
                     {consentPermissions.shareVitals ? (
                       <>
                         <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
@@ -1615,7 +1626,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* CLINICAL TRIALS & SUPPORT MATCHER */}
                     {consentPermissions.shareTrials ? (
                       <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-2.5">
                         <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center justify-between">
@@ -1730,7 +1740,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 2: SYMPTOM LOG, COUNTDOWN TIMELINE & DOCTOR PREP */}
+            {/* TAB 2: SYMPTOM LOG & DOCTOR PREP */}
             {activeTab === 'symptoms' && (
               <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
                 {consentPermissions.sharePrepTimeline ? (
@@ -1895,14 +1905,14 @@ export default function Dashboard() {
                     <span className="text-3xl">🔒</span>
                     <h3 className="text-sm font-bold text-slate-900">Symptom Log & Doctor Prep Redacted</h3>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      This section has been set to private via Patient Privacy Controls. Click "🔒 Privacy Controls" in the header to modify permissions.
+                      This section has been set to private via Patient Privacy Controls.
                     </p>
                   </div>
                 )}
               </section>
             )}
 
-            {/* TAB 3: FULL 12-MONTH CALENDAR ENGINE WITH EXPORT CSV BUTTON */}
+            {/* TAB 3: 12-MONTH CALENDAR & WELLNESS */}
             {activeTab === 'wellness' && (
               <section aria-label="12-Month Health Calendar & Tracking" className="space-y-4">
                 {consentPermissions.shareMentalHealth ? (
@@ -2064,9 +2074,14 @@ export default function Dashboard() {
                                 <button
                                   key={m}
                                   onClick={() => {
-                                    const updated = [...calendarLogs];
-                                    updated[selectedDateIndex].mood = m;
-                                    setCalendarLogs(updated);
+                                    setCalendarLogs((prevLogs) => {
+                                      const updated = [...prevLogs];
+                                      updated[selectedDateIndex] = {
+                                        ...updated[selectedDateIndex],
+                                        mood: m
+                                      };
+                                      return updated;
+                                    });
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer ${
                                     activeDayLog.mood === m
@@ -2090,9 +2105,12 @@ export default function Dashboard() {
                                 type="text"
                                 value={activeDayLog.bedtime || '11:00 PM'}
                                 onChange={(e) => {
-                                  const updated = [...calendarLogs];
-                                  updated[selectedDateIndex].bedtime = e.target.value;
-                                  setCalendarLogs(updated);
+                                  const val = e.target.value;
+                                  setCalendarLogs((prevLogs) => {
+                                    const updated = [...prevLogs];
+                                    updated[selectedDateIndex] = { ...updated[selectedDateIndex], bedtime: val };
+                                    return updated;
+                                  });
                                 }}
                                 className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
                               />
@@ -2104,9 +2122,12 @@ export default function Dashboard() {
                                 type="text"
                                 value={activeDayLog.wakeTime || '06:30 AM'}
                                 onChange={(e) => {
-                                  const updated = [...calendarLogs];
-                                  updated[selectedDateIndex].wakeTime = e.target.value;
-                                  setCalendarLogs(updated);
+                                  const val = e.target.value;
+                                  setCalendarLogs((prevLogs) => {
+                                    const updated = [...prevLogs];
+                                    updated[selectedDateIndex] = { ...updated[selectedDateIndex], wakeTime: val };
+                                    return updated;
+                                  });
                                 }}
                                 className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600"
                               />
@@ -2117,9 +2138,12 @@ export default function Dashboard() {
                               <select
                                 value={activeDayLog.caffeineIntake || '1-2 Cups ☕'}
                                 onChange={(e) => {
-                                  const updated = [...calendarLogs];
-                                  updated[selectedDateIndex].caffeineIntake = e.target.value as any;
-                                  setCalendarLogs(updated);
+                                  const val = e.target.value as any;
+                                  setCalendarLogs((prevLogs) => {
+                                    const updated = [...prevLogs];
+                                    updated[selectedDateIndex] = { ...updated[selectedDateIndex], caffeineIntake: val };
+                                    return updated;
+                                  });
                                 }}
                                 className="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded-md font-bold focus:outline-none focus:ring-1 focus:ring-indigo-600 cursor-pointer"
                               >
@@ -2140,9 +2164,12 @@ export default function Dashboard() {
                                 step="0.5"
                                 value={activeDayLog.sleepHours}
                                 onChange={(e) => {
-                                  const updated = [...calendarLogs];
-                                  updated[selectedDateIndex].sleepHours = parseFloat(e.target.value);
-                                  setCalendarLogs(updated);
+                                  const val = parseFloat(e.target.value);
+                                  setCalendarLogs((prevLogs) => {
+                                    const updated = [...prevLogs];
+                                    updated[selectedDateIndex] = { ...updated[selectedDateIndex], sleepHours: val };
+                                    return updated;
+                                  });
                                 }}
                                 className="w-full accent-indigo-600 cursor-pointer"
                               />
@@ -2156,9 +2183,12 @@ export default function Dashboard() {
                                 max="10"
                                 value={activeDayLog.stressLevel}
                                 onChange={(e) => {
-                                  const updated = [...calendarLogs];
-                                  updated[selectedDateIndex].stressLevel = parseInt(e.target.value);
-                                  setCalendarLogs(updated);
+                                  const val = parseInt(e.target.value, 10);
+                                  setCalendarLogs((prevLogs) => {
+                                    const updated = [...prevLogs];
+                                    updated[selectedDateIndex] = { ...updated[selectedDateIndex], stressLevel: val };
+                                    return updated;
+                                  });
                                 }}
                                 className="w-full accent-indigo-600 cursor-pointer"
                               />
@@ -2203,9 +2233,12 @@ export default function Dashboard() {
                             rows={3}
                             value={activeDayLog.notes || ''}
                             onChange={(e) => {
-                              const updated = [...calendarLogs];
-                              updated[selectedDateIndex].notes = e.target.value;
-                              setCalendarLogs(updated);
+                              const val = e.target.value;
+                              setCalendarLogs((prevLogs) => {
+                                const updated = [...prevLogs];
+                                updated[selectedDateIndex] = { ...updated[selectedDateIndex], notes: val };
+                                return updated;
+                              });
                             }}
                             placeholder="e.g. Woke up with mild shortness of breath, used Albuterol inhaler before morning run..."
                             className="w-full p-3 text-xs bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
@@ -2219,14 +2252,14 @@ export default function Dashboard() {
                     <span className="text-3xl">🔒</span>
                     <h3 className="text-sm font-bold text-slate-900">12-Month Calendar & Wellness Module Redacted</h3>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      This section has been set to private via Patient Privacy Controls. Click "🔒 Privacy Controls" in the header to modify permissions.
+                      This section has been set to private via Patient Privacy Controls.
                     </p>
                   </div>
                 )}
               </section>
             )}
 
-            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH GENERATOR TRIGGER */}
+            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH WORKOUT TRACKER */}
             {activeTab === 'fitness' && (
               <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
                 {consentPermissions.shareFitness ? (
@@ -2242,6 +2275,7 @@ export default function Dashboard() {
                       />
                     )}
 
+                    {}
                     <WorkoutTracker 
                       patient={patient} 
                       deadliftPR={deadliftPR}
@@ -2253,6 +2287,9 @@ export default function Dashboard() {
                       onUpdateMileRunPR={(val) => setMileRunPR(val)}
                       onUpdateFiveKRunPR={(val) => setFiveKRunPR(val)}
                       onOpenGenerator={() => setShowWorkoutModal(true)}
+                      calendarLogs={calendarLogs}
+                      selectedDateLabel={activeDayLog ? activeDayLog.dateStr : 'Aug 1'}
+                      onLogWorkout={(exercise, details) => handleLogWorkoutToCalendar(exercise, details)}
                     />
 
                     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -2347,6 +2384,7 @@ export default function Dashboard() {
         </p>
       </footer>
 
+      {}
       <PulseChatDrawer 
         patient={patient} 
         calendarLogs={calendarLogs}
