@@ -237,6 +237,20 @@ export default function Dashboard() {
 
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(true);
   const [showWorkoutModal, setShowWorkoutModal] = useState<boolean>(false);
+  const [showVitalsModal, setShowVitalsModal] = useState<boolean>(false);
+  const [showFHIRJsonModal, setShowFHIRJsonModal] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Vitals Form State
+  const [newSystolic, setNewSystolic] = useState<string>('120');
+  const [newDiastolic, setNewDiastolic] = useState<string>('80');
+  const [newHeartRate, setNewHeartRate] = useState<string>('72');
+  const [newHbA1c, setNewHbA1c] = useState<string>('5.7');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(7); // August 2026
@@ -264,6 +278,7 @@ export default function Dashboard() {
     setConnectedPortal(null);
     setPatient(null);
     setShowEHRModal(false);
+    showToast('🔌 EHR Session Disconnected');
   };
 
   const [enableRPGSystem, setEnableRPGSystem] = useState<boolean>(false);
@@ -330,6 +345,7 @@ export default function Dashboard() {
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
     pdf.save(`${patient?.name || 'Patient'}_Doctor_Prep_Agenda.pdf`);
+    showToast('📥 Agenda PDF Downloaded');
   };
 
   const cardRef = useRef<HTMLDivElement>(null);
@@ -419,6 +435,7 @@ export default function Dashboard() {
 
       return updated;
     });
+    showToast('🎉 All medications marked taken for month!');
   };
 
   const handleExportMonthlyCSV = () => {
@@ -437,6 +454,38 @@ export default function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showToast('📄 Monthly CSV Log Exported');
+  };
+
+  const handleSaveNewVitals = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patient) return;
+
+    const sys = parseInt(newSystolic, 10) || 120;
+    const dia = parseInt(newDiastolic, 10) || 80;
+    const hr = parseInt(newHeartRate, 10) || 72;
+    const hba1cVal = parseFloat(newHbA1c) || 5.7;
+
+    const newBpStr = `${sys}/${dia}`;
+    const newBpStatus = (sys >= 140 || dia >= 90) ? 'warning' : 'normal';
+    const newHrStatus = (hr >= 100 || hr < 50) ? 'warning' : 'normal';
+    const newHbStatus = hba1cVal >= 6.5 ? 'warning' : 'normal';
+
+    setPatient({
+      ...patient,
+      vitals: {
+        ...patient.vitals,
+        bp: newBpStr,
+        bpStatus: newBpStatus,
+        heartRate: `${hr} bpm`,
+        hrStatus: newHrStatus,
+        hba1c: `${hba1cVal}%`,
+        hba1cStatus: newHbStatus,
+      }
+    });
+
+    setShowVitalsModal(false);
+    showToast(`✅ Vitals updated: BP ${newBpStr}, HR ${hr} bpm`);
   };
 
   const handleLogMedsForDate = (targetDateStr: string) => {
@@ -721,6 +770,12 @@ export default function Dashboard() {
       <div className="fixed top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none -z-10"></div>
       <div className="fixed top-1/3 right-10 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
+      {toastMessage && (
+        <div className="fixed top-3 right-3 z-50 bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 animate-bounce">
+          {toastMessage}
+        </div>
+      )}
+
       <div className="bg-slate-900 text-white text-[11px] py-1.5 px-4 print:hidden border-b border-slate-800">
         <div className="max-w-6xl mx-auto flex items-center justify-between font-medium">
           <div className="flex items-center gap-2">
@@ -731,7 +786,14 @@ export default function Dashboard() {
               {connectedPortal ? `Connected to ${connectedPortal}` : 'No Active Health Record Sync'}
             </span>
           </div>
-          <div className="hidden sm:flex items-center gap-4 text-slate-400">
+          <div className="hidden sm:flex items-center gap-3 text-slate-400">
+            <button
+              onClick={() => setShowFHIRJsonModal(true)}
+              className="text-indigo-300 hover:text-white font-bold transition flex items-center gap-1"
+            >
+              📄 Export FHIR R4 Bundle
+            </button>
+            <span>•</span>
             <span>Encrypted Session</span>
             <span>ID: {patient?.id || 'Disconnected'}</span>
           </div>
@@ -885,6 +947,152 @@ export default function Dashboard() {
               >
                 Got It! Take Me to My Dashboard →
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ➕ LOG NEW VITALS MODAL */}
+        {showVitalsModal && patient && (
+          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
+              <button
+                onClick={() => setShowVitalsModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
+                <span className="text-2xl">⚡</span>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Log New Vital Signs
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Record latest readings for {patient.name}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveNewVitals} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1">Systolic BP (mmHg)</label>
+                    <input
+                      type="number"
+                      required
+                      value={newSystolic}
+                      onChange={(e) => setNewSystolic(e.target.value)}
+                      placeholder="120"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1">Diastolic BP (mmHg)</label>
+                    <input
+                      type="number"
+                      required
+                      value={newDiastolic}
+                      onChange={(e) => setNewDiastolic(e.target.value)}
+                      placeholder="80"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1">Heart Rate (bpm)</label>
+                    <input
+                      type="number"
+                      required
+                      value={newHeartRate}
+                      onChange={(e) => setNewHeartRate(e.target.value)}
+                      placeholder="72"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1">HbA1c Level (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={newHbA1c}
+                      onChange={(e) => setNewHbA1c(e.target.value)}
+                      placeholder="5.7"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-xl text-xs transition shadow cursor-pointer font-sans"
+                >
+                  Save New Vitals →
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 📄 EXPORT FHIR JSON BUNDLE MODAL */}
+        {showFHIRJsonModal && patient && (
+          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-300 space-y-4 relative">
+              <button
+                onClick={() => setShowFHIRJsonModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 font-bold text-base p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
+                <span className="text-2xl">📄</span>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    FHIR R4 JSON Bundle Export
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Encrypted clinical data payload for interoperability
+                  </p>
+                </div>
+              </div>
+
+              <textarea
+                readOnly
+                rows={10}
+                value={JSON.stringify({
+                  resourceType: "Bundle",
+                  type: "collection",
+                  entry: [
+                    { resource: { resourceType: "Patient", id: patient.id, name: patient.name, dob: patient.dob, gender: patient.gender } },
+                    { resource: { resourceType: "Observation", code: "Blood Pressure", value: patient.vitals.bp } },
+                    { resource: { resourceType: "Observation", code: "Heart Rate", value: patient.vitals.heartRate } },
+                    { resource: { resourceType: "MedicationStatement", medications: patient.medications } }
+                  ]
+                }, null, 2)}
+                className="w-full p-3 font-mono text-[10px] bg-slate-950 text-emerald-400 rounded-xl border border-slate-800 focus:outline-none"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(patient, null, 2));
+                    showToast('📋 FHIR R4 JSON Copied to Clipboard!');
+                  }}
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer"
+                >
+                  📋 Copy JSON
+                </button>
+                <button
+                  onClick={() => setShowFHIRJsonModal(false)}
+                  className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow cursor-pointer font-sans"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1102,7 +1310,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* EMERGENCY HEALTH ID CARD MODAL */}
         {showEmergencyModal && patient && (
           <div 
             role="dialog" 
@@ -1240,7 +1447,6 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {}
             <nav aria-label="Dashboard Navigation Tabs" className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 print:hidden bg-white/60 p-1.5 rounded-2xl border border-slate-200/80 shadow-sm">
               <button
                 onClick={() => setActiveTab('vitals')}
@@ -1292,7 +1498,7 @@ export default function Dashboard() {
               </button>
             </nav>
 
-            {/* TAB 1: SUMMARY & EHR RECORD */}
+            {/* TAB 1 */}
             {activeTab === 'vitals' && (
               <section aria-label="EHR Health Record Overview" className="space-y-4">
                 <div className="bg-indigo-950 text-white p-5 rounded-xl shadow-md space-y-3 border border-indigo-900">
@@ -1452,9 +1658,17 @@ export default function Dashboard() {
                     {consentPermissions.shareVitals ? (
                       <>
                         <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm space-y-3">
-                          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                            ⚡ Vital Signs & Body Metrics
-                          </h3>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                              ⚡ Vital Signs & Body Metrics
+                            </h3>
+                            <button
+                              onClick={() => setShowVitalsModal(true)}
+                              className="text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition"
+                            >
+                              + Log New Reading
+                            </button>
+                          </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center">
                             <div className={`p-2.5 rounded-lg border text-xs ${bpCategory.bg} ${bpCategory.border}`}>
@@ -1740,7 +1954,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 2: SYMPTOM LOG & DOCTOR PREP */}
+            {/* TAB 2 */}
             {activeTab === 'symptoms' && (
               <section aria-label="Symptom Logging & Visit Preparation" className="space-y-4">
                 {consentPermissions.sharePrepTimeline ? (
@@ -1912,7 +2126,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 3: 12-MONTH CALENDAR & WELLNESS */}
+            {/* TAB 3 */}
             {activeTab === 'wellness' && (
               <section aria-label="12-Month Health Calendar & Tracking" className="space-y-4">
                 {consentPermissions.shareMentalHealth ? (
@@ -2076,10 +2290,7 @@ export default function Dashboard() {
                                   onClick={() => {
                                     setCalendarLogs((prevLogs) => {
                                       const updated = [...prevLogs];
-                                      updated[selectedDateIndex] = {
-                                        ...updated[selectedDateIndex],
-                                        mood: m
-                                      };
+                                      updated[selectedDateIndex] = { ...updated[selectedDateIndex], mood: m };
                                       return updated;
                                     });
                                   }}
@@ -2259,7 +2470,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TAB 4: ACTIVITY & FITNESS TELEMETRY WITH WORKOUT TRACKER */}
+            {/* TAB 4 */}
             {activeTab === 'fitness' && (
               <section aria-label="Activity and Fitness Telemetry" className="space-y-4">
                 {consentPermissions.shareFitness ? (
@@ -2275,7 +2486,6 @@ export default function Dashboard() {
                       />
                     )}
 
-                    {}
                     <WorkoutTracker 
                       patient={patient} 
                       deadliftPR={deadliftPR}
@@ -2384,7 +2594,6 @@ export default function Dashboard() {
         </p>
       </footer>
 
-      {}
       <PulseChatDrawer 
         patient={patient} 
         calendarLogs={calendarLogs}
@@ -2699,6 +2908,7 @@ export default function Dashboard() {
                           setPatient(target);
                           setSelectedPatientId(target.id);
                           setConnectedPortal(`${selectedProvider} (Medblocks FHIR R4)`);
+                          showToast(`✅ Synced FHIR Record for ${target.name}`);
                         }
                         setShowEHRModal(false);
                         setLinkStep('provider');
