@@ -887,56 +887,57 @@ export default function Dashboard() {
                     Welcome to Pulse Companion! 👋
                   </h2>
                   <p className="text-xs text-slate-500 font-medium">
-                    Your Connected Health Record & Clinical Navigation Portal
+                    Connected Health Record & Clinical Navigation Portal
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3 text-xs">
                 <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl space-y-1">
-                  <span className="font-extrabold text-indigo-950 block text-xs">🚀 How to Get Started (3 Quick Steps):</span>
+                  <span className="font-extrabold text-indigo-950 block text-xs">🚀 Quick Onboarding Guide:</span>
                   <ol className="list-decimal pl-4 space-y-1 text-slate-700 font-medium">
-                    <li>Click <strong>🔗 Connect Health Records</strong> in the top menu to select a sandbox record (e.g., Paul Tremblay).</li>
-                    <li>Explore the 4 primary tabs below to view vitals, log symptoms, or generate workouts.</li>
-                    <li>Ask the <strong>Pulse AI Assistant</strong> (bottom right drawer) to log notes, answer prescription questions, or review adherence!</li>
+                    <li>Click <strong>🔗 Connect Health Records</strong> in the top bar to load a patient profile (e.g. Paul Tremblay).</li>
+                    <li>Use the <strong>4 Navigation Tabs</strong> below to view EHR records, log symptoms, track wellness, or sync exercise.</li>
+                    <li>Open the <strong>Pulse AI Drawer</strong> (bottom right) to ask questions about your prescriptions or log workouts directly into your calendar!</li>
                   </ol>
                 </div>
 
                 <div className="space-y-2">
                   <span className="font-extrabold text-slate-800 block uppercase tracking-wider text-[11px]">
-                    📍 Where to Find Things:
+                    📍 Primary Navigation Panels:
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="font-bold text-slate-900 block">• 📈 Summary & EHR Record</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">View vitals, active prescriptions, doctor notes, and predictive disease risk models.</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">View vitals, active prescriptions, doctor notes, lab panels, and disease risk models.</p>
                     </div>
 
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="font-bold text-slate-900 block">• 🩺 Symptom Log & Doctor Prep</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Track current symptoms, countdown to upcoming visits, and generate AI doctor agendas.</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Track current symptoms, countdown to visits, and generate AI doctor appointment agendas.</p>
                     </div>
 
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="font-bold text-slate-900 block">• 🌙 12-Month Calendar</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Interactive daily wellness tracking for sleep, mood, medications, and CSV exports.</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Interactive daily logging for sleep, mood, medication adherence, and CSV exports.</p>
                     </div>
 
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="font-bold text-slate-900 block">• 🏃 Activity & Fitness Sync</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Apple Health telemetry, PR benchmarks, <strong>AI Workout Generator</strong>, & optional RPG gamification.</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">PR strength benchmarks, Apple Health telemetry, <strong>AI Workout Generator</strong>, & optional RPG stats.</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 space-y-1">
-                  <span className="font-extrabold text-slate-900 block">✨ Special Features:</span>
+                  <span className="font-extrabold text-slate-900 block">⚡ Advanced Clinical Tools:</span>
                   <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
-                    • <strong>🏋️ AI Workout Generator:</strong> Generate custom routines by muscle group or equipment via Tab 4 or chat prompts.<br />
-                    • <strong>🥗 Meal AI Scan:</strong> Snap/describe meals to check sodium/glycemic clash against diagnoses.<br />
-                    • <strong>🚨 Emergency ID:</strong> Instant wallet card printout with QR codes and allergen alerts.<br />
-                    • <strong>🔒 Privacy Controls:</strong> Fine-grained data toggles to hide or share clinical modules.
+                    • <strong>⚡ Live Vitals Logger:</strong> Click <em>+ Log New Reading</em> in Tab 1 to update BP, HR, or HbA1c.<br />
+                    • <strong>📄 FHIR R4 JSON Export:</strong> Export interoperable encrypted JSON bundles in the top status bar.<br />
+                    • <strong>🏋️ AI Workout Generator:</strong> Generate custom routines by muscle group or equipment directly on Tab 4.<br />
+                    • <strong>🥗 Meal AI Scan:</strong> Scan or describe meals to check sodium and glycemic conflicts against diagnoses.<br />
+                    • <strong>🚨 Emergency ID:</strong> Print wallet cards with emergency contact QR codes and allergen alerts.
                   </p>
                 </div>
               </div>
